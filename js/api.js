@@ -88,6 +88,8 @@ GM.handleSongs = function (name, data) {
 };
 
 /* ===== 核心获取歌手歌曲 ===== */
+GM._jsonpMode = false; // 全局标记：一旦 fetch 被拦截（如 iOS），后续全走 JSONP
+
 GM.coreFetchArtist = function (name, onSuccess, onFail) {
   var query = "/search?term=" + encodeURIComponent(name) + "&entity=song&attribute=artistTerm&limit=200&country=CN&media=music";
   
@@ -104,7 +106,59 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
     onFail("获取失败：无法连接歌曲服务，请换个网络环境再试，或到电脑端使用该功能");
   }
 
-  // ==== 新增：先尝试请求我们部署的 Cloudflare Functions 代理 ====
+  // ==== 智能请求：参考竞品方案，规避 iOS Universal Links 拦截 ====
+  function smartGet(hostIdx) {
+    if (hostIdx >= GM.ITUNES_HOSTS.length) {
+      // 官方直连和 JSONP 都失败，走 Cloudflare Functions 代理兜底
+      tryFunctionsProxy();
+      return;
+    }
+    
+    var url = GM.ITUNES_HOSTS[hostIdx] + query;
+    
+    if (!GM._jsonpMode && window.fetch) {
+      var done = false;
+      var timer = setTimeout(function() {
+        if (done) return; done = true;
+        GM._jsonpMode = true;
+        tryJsonp(hostIdx);
+      }, 8000); // 8秒超时切 jsonp
+      
+      fetch(url)
+        .then(function(res) {
+          if (done) return; done = true;
+          clearTimeout(timer);
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          return res.json();
+        })
+        .then(function(data) {
+          onData(data);
+        })
+        .catch(function(e) {
+          if (done) return; done = true;
+          clearTimeout(timer);
+          // 核心：iOS Safari 拦截 fetch 时会抛错，此时全局切换为 jsonp 模式并立即重试
+          console.warn("Fetch 失败 (可能被 iOS 拦截)，切换到 JSONP 模式:", e);
+          GM._jsonpMode = true;
+          tryJsonp(hostIdx);
+        });
+    } else {
+      // 已经确认为 jsonp 模式（如已被 iOS 拦截过），直接走 jsonp
+      tryJsonp(hostIdx);
+    }
+  }
+
+  function tryJsonp(idx) {
+    GM.jsonp(GM.ITUNES_HOSTS[idx] + query, function (err, data) {
+      if (err) {
+        // 当前 host 的 jsonp 也失败了，尝试下一个 host
+        smartGet(idx + 1);
+      } else {
+        onData(data);
+      }
+    });
+  }
+
   function tryFunctionsProxy() {
     var apiUrl = "/api/search?term=" + encodeURIComponent(name);
     fetch(apiUrl)
@@ -116,18 +170,9 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
         onData(data);
       })
       .catch(function(e) {
-        // 如果 Functions 代理失败（比如本地测试环境、或者没部署对），降级走原有的 JSONP 逻辑
-        console.warn("Functions 代理失败，降级到原始策略:", e);
-        tryJsonp(0);
+        console.warn("Functions 代理失败，降级到公共 CORS 代理:", e);
+        tryProxy();
       });
-  }
-
-  function tryJsonp(idx) {
-    if (idx >= GM.ITUNES_HOSTS.length) { tryProxy(); return; }
-    GM.jsonp(GM.ITUNES_HOSTS[idx] + query, function (err, data) {
-      if (err) { tryJsonp(idx + 1); return; }
-      onData(data);
-    });
   }
 
   function tryProxy() {
@@ -137,39 +182,8 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
     });
   }
 
-  // 判断是否为移动端设备（包含 iOS 和 Android，以及 iPadOS）
-  var isMobile = /iPhone|iPad|iPod|Android|Mobi/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-  if (isMobile) {
-    // 移动端（特别是 iOS）极易触发 Universal Links 拦截，导致跳出浏览器或请求挂起
-    // 因此移动端直接使用 Functions 代理，若失败则降级到公共 CORS 代理，彻底避开直连 itunes.apple.com
-    function mobileFunctionsProxy() {
-      var apiUrl = "/api/search?term=" + encodeURIComponent(name);
-      fetch(apiUrl)
-        .then(function(res) {
-          if (!res.ok) throw new Error("Functions API Error");
-          return res.json();
-        })
-        .then(function(data) {
-          onData(data);
-        })
-        .catch(function(e) {
-          console.warn("Functions 代理失败，降级到公共 CORS 代理:", e);
-          tryProxy();
-        });
-    }
-    mobileFunctionsProxy();
-  } else {
-    // 默认启动流程：PC 端优先走官方直连，失败再走代理
-    GM.fetchJson(GM.ITUNES_HOSTS[1] + query, function (err, data) {
-      if (err) { 
-        // 直连失败，走我们的 Functions 代理
-        tryFunctionsProxy(); 
-        return; 
-      }
-      onData(data);
-    });
-  }
+  // 默认启动流程：从主 host (itunes.apple.com) 开始尝试智能获取
+  smartGet(1);
 };
 
 /* ===== 提取封面通用逻辑 ===== */
