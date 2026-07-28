@@ -1,5 +1,5 @@
 export async function onRequest(context) {
-  // 1. 获取前端传过来的参数啊啊
+  // 1. 获取前端传过来的参数啊啊123
   const url = new URL(context.request.url);
   const term = url.searchParams.get('term');
 
