@@ -88,7 +88,8 @@ GM.handleSongs = function (name, data) {
 };
 
 /* ===== 核心获取歌手歌曲 ===== */
-GM._jsonpMode = false; // 全局标记：一旦 fetch 被拦截（如 iOS），后续全走 JSONP
+/* ===== 核心获取歌手歌曲 ===== */
+GM._jsonpMode = false;
 
 GM.coreFetchArtist = function (name, onSuccess, onFail) {
   var query = "/search?term=" + encodeURIComponent(name) + "&entity=song&attribute=artistTerm&limit=200&country=CN&media=music";
@@ -106,10 +107,24 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
     onFail("获取失败：无法连接歌曲服务，请换个网络环境再试，或到电脑端使用该功能");
   }
 
-  // ==== 智能请求：参考竞品方案，规避 iOS Universal Links 拦截 ====
+  // ==== 新增：环境检测工具函数 ====
+  function isIOS() {
+    // 兼容传统的 iPhone/iPad 以及 iPadOS（伪装成Mac但支持触控）
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+
+  // ==== 智能请求：修改后的逻辑 ====
   function smartGet(hostIdx) {
+    // 核心修复：如果是 iOS 设备，直接跳过官方直连，强制使用 Cloudflare 代理！
+    // 避免触发底层的 Universal Links 拉起 Apple Music
+    if (isIOS()) {
+      tryFunctionsProxy();
+      return;
+    }
+
     if (hostIdx >= GM.ITUNES_HOSTS.length) {
-      // 官方直连和 JSONP 都失败，走 Cloudflare Functions 代理兜底
+      // 非 iOS 设备官方直连和 JSONP 都失败，走代理兜底
       tryFunctionsProxy();
       return;
     }
@@ -122,7 +137,7 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
         if (done) return; done = true;
         GM._jsonpMode = true;
         tryJsonp(hostIdx);
-      }, 8000); // 8秒超时切 jsonp
+      }, 8000); 
       
       fetch(url)
         .then(function(res) {
@@ -137,13 +152,10 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
         .catch(function(e) {
           if (done) return; done = true;
           clearTimeout(timer);
-          // 核心：iOS Safari 拦截 fetch 时会抛错，此时全局切换为 jsonp 模式并立即重试
-          console.warn("Fetch 失败 (可能被 iOS 拦截)，切换到 JSONP 模式:", e);
           GM._jsonpMode = true;
           tryJsonp(hostIdx);
         });
     } else {
-      // 已经确认为 jsonp 模式（如已被 iOS 拦截过），直接走 jsonp
       tryJsonp(hostIdx);
     }
   }
@@ -151,7 +163,6 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
   function tryJsonp(idx) {
     GM.jsonp(GM.ITUNES_HOSTS[idx] + query, function (err, data) {
       if (err) {
-        // 当前 host 的 jsonp 也失败了，尝试下一个 host
         smartGet(idx + 1);
       } else {
         onData(data);
@@ -182,7 +193,7 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
     });
   }
 
-  // 默认启动流程：从主 host (itunes.apple.com) 开始尝试智能获取
+  // 默认启动流程
   smartGet(1);
 };
 
