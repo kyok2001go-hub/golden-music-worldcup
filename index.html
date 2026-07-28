@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="color-scheme" content="only dark">
+<title>金曲世界杯 · 歌曲PK · 哪一首是你的意难平</title>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+<div class="page">
+
+  <!-- ===== 改造后的页面头部 ===== -->
+  <div class="header-section">
+    <!-- 封面图存放容器 -->
+    <div class="header-covers" id="headerCovers"></div>
+    <!-- 半透明渐变遮罩 -->
+    <div class="header-gradient" id="headerGradient" style="display:none;"></div>
+
+    <!-- 单按钮视图切换 -->
+    <button id="btnViewToggle" class="btn-view-toggle" title="切换视图">
+      <!-- 对阵图(类树状) SVG -->
+      <svg id="iconBracket" viewBox="0 0 24 24"><path d="M22 11V3h-7v3H9V3H2v8h7V8h2v10h4v3h7v-8h-7v3h-2V8h2v3z"/></svg>
+      <!-- 主页(快速开始) SVG -->
+      <svg id="iconHome" style="display:none;" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+    </button>
+
+    <!-- 1/3 比例撑开盒子及页面标题 -->
+    <div class="header-ratio">
+      <div class="header-content">
+        <input id="titleInput" maxlength="40" placeholder="填写争霸赛标题">
+      </div>
+    </div>
+  </div>
+
+  <!-- 视图1 - 快速开始页 -->
+  <div id="viewQuickStart">
+    <div class="qs-state-1" id="qsState1">
+      <div class="qs-emojis">
+        <span>🎵</span>
+        <span class="emoji-lg">🏆</span>
+        <span>🎧</span>
+      </div>
+      <div class="qs-search-box" id="qsSearchBox">
+        <input type="text" class="qs-search-input" id="qsSearchInput" placeholder="输入歌手名称" autocomplete="off">
+        <select class="qs-search-size" id="qsSizeSelect">
+          <option value="64">64强</option>
+          <option value="32">32强</option>
+          <option value="16">16强</option>
+        </select>
+        <button class="qs-search-btn" id="qsSearchBtn" title="搜索">
+          <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+          <div class="spinner"></div>
+        </button>
+      </div>
+      <div class="qs-subtitle">选择你喜欢的歌手，来一场金曲对决</div>
+      <div class="artist-picks" id="qsArtistPicks" style="justify-content: center;">
+        <button class="artist-pick" data-name="孙燕姿">孙燕姿</button>
+        <button class="artist-pick" data-name="周杰伦">周杰伦</button>
+        <button class="artist-pick" data-name="邓紫棋">邓紫棋</button>
+        <button class="artist-pick" data-name="蔡依林">蔡依林</button>
+        <button class="artist-pick" data-name="陈奕迅">陈奕迅</button>
+        <button class="artist-pick" data-name="林俊杰">林俊杰</button>
+      </div>
+      <div class="qs-footer">
+        <a href="https://www.xiaohongshu.com/user/profile/59f3108711be1021e70e7e96" target="_blank">关于作者</a>
+        <span>·</span>
+        <a href="https://sfztkybu.jsjform.com/f/yji8rE" target="_blank">问题建议</a>
+      </div>
+    </div>
+
+    <!-- 状态2/3：准备对阵与结算容器 -->
+    <div class="qs-state-2" id="qsState2">
+      <div class="qs-r-header">
+        <div class="qs-r-header-top">
+          <span class="qs-r-progress" id="qsProgressText"></span>
+          <button class="qs-r-reselect" id="qsBtnReselect">重选</button>
+        </div>
+        <div class="qs-r-progress-bar">
+          <div id="qsProgressFill2"></div>
+        </div>
+      </div>
+      <div class="qs-r-list" id="qsPlayerList"></div>
+    </div>
+  </div>
+
+  <div id="qsActionsWrap">
+    <!-- 状态2 操作悬浮底栏 -->
+    <div class="qs-r-actions" id="qsActionsState2">
+      <button class="qs-btn-act secondary" id="qsBtnShuffle">随机分组</button>
+      <button class="qs-btn-act primary" id="qsBtnStartMatch">开始对阵</button>
+    </div>
+    <!-- 状态3 操作悬浮底栏 -->
+    <div class="qs-r-actions" id="qsActionsState3" style="display:none;">
+      <button class="qs-btn-act secondary" id="qsBtnRestart">重来一次</button>
+      <button class="qs-btn-act primary" id="qsBtnViewResult">查看比赛结果</button>
+    </div>
+  </div>
+
+  <!-- 视图2：对阵图 -->
+  <div id="viewBracket">
+    <div class="toolbar">
+      <span class="hint" id="hintText">玩法：导入或手动填写选项 → 开始对决，来选出你心中的冠军吧~</span>
+      <button class="btn btn-emph" id="btnImportArtist">导入歌手热歌</button>
+      <select class="btn ghost size-select" id="sizeSelect">
+        <option value="64">64强</option>
+        <option value="32">32强</option>
+        <option value="16">16强</option>
+      </select>
+      <button class="btn ghost" id="btnShuffleOrig">随机分组</button>
+      <button class="btn ghost" id="btnMore">更多 ▾</button>
+      <button class="btn ghost more-item" id="btnResetWinners">重置全部对阵</button>
+      <button class="btn ghost more-item" id="btnCopyImg">复制图片</button>
+      <button class="btn ghost more-item" id="btnDownloadImg">下载图片</button>
+      <button class="btn danger more-item" id="btnClearAll">清空全部</button>
+    </div>
+
+    <div class="table-scroll">
+      <div class="bracket-wrap" id="bracketWrap">
+        <svg id="connectorSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+        <table id="bracket">
+          <colgroup id="colgroup"></colgroup>
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="progress-line">
+      <span id="progressText">已决出 0 / 63 场</span>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+  </div>
+
+  <!-- 底部悬浮按钮：回顾冠军历程 -->
+  <div class="fab-review" id="fabReview">回顾冠军历程</div>
+</div>
+
+<!-- ================= 各种弹窗保留 ================= -->
+
+<!-- 比赛结果沉浸式弹窗 -->
+<div class="result-mask" id="resultMask">
+  <div class="result-box">
+    <span class="result-close" id="resultClose" title="关闭">✕</span>
+    <div class="res-champ-sec"><span class="icon">🏆</span><div class="name" id="resChampName"></div></div>
+    <div class="res-box-item"><span class="icon">🥈</span><div class="names"><div class="name-line" id="resRunnerUp"></div></div></div>
+    <div class="res-box-item"><span class="icon">🏅</span><div class="names"><div class="name-line" id="resTop4_1"></div><div class="name-line" id="resTop4_2"></div></div></div>
+    <div class="res-road-sec"><div class="res-road-title">冠军之路</div><div class="road-list" id="resRoadList"></div></div>
+    <button class="btn-res-share" id="btnResShare">分享对阵图</button>
+  </div>
+</div>
+
+<!-- 分享图片预览弹窗 -->
+<div class="result-mask" id="imgMask">
+  <div class="result-box">
+    <span class="result-close" id="imgClose" title="关闭">✕</span>
+    <div class="res-road-title" style="margin-bottom: 8px; font-size: 15px; color: #fff;">长按图片保存或分享</div>
+    <div style="width: 100%; max-height: 70vh; overflow-y: auto; border-radius: 8px; border: 1px solid rgba(255,255,255,.15); background: transparent;">
+      <img id="previewImg" src="">
+    </div>
+  </div>
+</div>
+
+<!-- 批量输入弹窗 -->
+<div class="modal-mask" id="batchMask">
+  <div class="modal">
+    <div class="modal-head">
+      <span>批量录入选项</span>
+      <span class="modal-close" id="batchClose" title="关闭">✕</span>
+    </div>
+    <div class="modal-body">
+      <div class="modal-actions-top">
+        <button class="btn ghost" id="btnBatchDemo">填充示例</button>
+      </div>
+      <textarea id="batchArea" placeholder="每行输入一项，空行自动跳过；识别到的前 N 行对应录入前 N 项，超过当前规模项数自动截断。"></textarea>
+      <div class="modal-tip" id="batchTip">规则：按行识别（空行跳过）→ 前 N 行依次填入第 1~N 项 → 超过当前规模行数自动截断 → 单项超 30 字自动截断。应用后会重置全部对阵结果。</div>
+    </div>
+    <div class="modal-foot">
+      <span class="batch-count" id="batchCount">已识别 0 项</span>
+      <span class="right">
+        <button class="btn" id="btnBatchApply">应用</button>
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- 导入歌手热歌弹窗 -->
+<div class="modal-mask" id="artistMask">
+  <div class="modal">
+    <div class="modal-head">
+      <span>导入歌手热门歌曲</span>
+      <span class="modal-close" id="artistClose" title="关闭">✕</span>
+    </div>
+    <div class="modal-body" style="padding: 24px 20px 10px;">
+      <input id="artistInput" placeholder="输入歌手名字，如：孙燕姿" maxlength="40">
+      <div class="artist-picks" id="artistPicksOld">
+        <button class="artist-pick" data-name="孙燕姿">孙燕姿</button>
+        <button class="artist-pick" data-name="周杰伦">周杰伦</button>
+        <button class="artist-pick" data-name="邓紫棋">邓紫棋</button>
+        <button class="artist-pick" data-name="蔡依林">蔡依林</button>
+        <button class="artist-pick" data-name="陈奕迅">陈奕迅</button>
+        <button class="artist-pick" data-name="林俊杰">林俊杰</button>
+      </div>
+      <div class="artist-status" id="artistStatus"></div>
+      <div class="modal-tip" id="artistTip" style="text-align: center; font-size: 13px; color: rgba(255,255,255,.7);">iOS 如果导入失败，请使用默认浏览器打开，并在菜单中「请求桌面网站」</div>
+    </div>
+    <div class="modal-foot" style="justify-content: center; gap: 16px; border-top: none; padding-bottom: 24px;">
+      <button class="btn ghost" id="btnOpenBatchFromArtist" style="padding: 10px 32px; font-size: 15px; border: 1px solid rgba(255,255,255,.25);">手动录入</button>
+      <button class="btn" id="btnFetchArtist" style="padding: 10px 32px; font-size: 15px;">导入歌曲</button>
+    </div>
+  </div>
+</div>
+
+<!-- 极具沉浸感的带播放机界面的对阵选择弹窗 -->
+<div class="vs-mask" id="vsMask">
+  <div class="vs-box">
+    <span class="vs-close" id="vsClose" title="关闭">✕</span>
+    <div class="vs-title" id="vsTitle">选择胜者</div>
+
+    <div class="vs-body">
+      <div class="vs-cards">
+        <div class="vs-card" id="vsCardA">
+          <div class="vs-card-name" id="vsNameA"></div>
+          <div class="vs-card-disc-group">
+             <div class="vs-card-cd-disc">💿</div>
+             <div class="vs-card-cover" id="vsCoverA"></div>
+          </div>
+        </div>
+        <div class="vs-mid">VS</div>
+        <div class="vs-card" id="vsCardB">
+          <div class="vs-card-name" id="vsNameB"></div>
+          <div class="vs-card-disc-group">
+             <div class="vs-card-cd-disc">💿</div>
+             <div class="vs-card-cover" id="vsCoverB"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="vs-player-wrap">
+      <!-- 本地引用的 CD Player，内嵌自走时屏幕 -->
+      <div class="vs-player-inner">
+        <img class="vs-player-img" src="./CD_player.png" alt="CD Player">
+        <div class="vs-player-screen" id="vsPlayerScreen">TRACK 1/63 &nbsp;&nbsp; 00:00</div>
+      </div>
+    </div>
+
+    <div class="vs-foot">
+      <div class="vs-row">
+        <label class="vs-cont"><input type="checkbox" id="vsContinuous" checked>连续对阵</label>
+        <button class="vs-clear" id="vsClear">清空本场</button>
+      </div>
+      <div class="vs-hint" id="vsHint"></div>
+    </div>
+    <div class="vs-progress-track">
+      <div class="vs-progress-fill" id="vsProgressFill"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 自定义确认弹窗 -->
+<div class="confirm-mask" id="confirmMask">
+  <div class="confirm-box">
+    <div class="confirm-msg" id="confirmMsg"></div>
+    <div class="confirm-btns">
+      <button id="confirmCancel">取消</button>
+      <button class="ok" id="confirmOk">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== JS 模块加载（顺序敏感，勿乱序） ===== -->
+<script src="js/state.js"></script>
+<script src="js/api.js"></script>
+<script src="js/theme.js"></script>
+<script src="js/render.js"></script>
+<script src="js/export.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

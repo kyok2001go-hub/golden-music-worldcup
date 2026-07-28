@@ -1,0 +1,30 @@
+/* ===== base.css — 基础样式与全局变量 ===== */
+
+/* ===== 全局重置 ===== */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+  background: #121212;
+  background-attachment: fixed;
+  padding: 20px 12px 20px;
+  color: #eef0f8;
+}
+
+/* ===== 页面容器 ===== */
+.page {
+  max-width: 860px; margin: 0 auto; position: relative;
+  display: flex; flex-direction: column;
+  min-height: calc(100vh - 40px);
+}
+
+/* ===== 全局动画 ===== */
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== 加载旋转图标 ===== */
+.spinner {
+  display: none; width: 20px; height: 20px;
+  border: 2px solid rgba(255,255,255,.2);
+  border-top-color: #fff; border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
