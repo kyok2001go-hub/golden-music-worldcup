@@ -137,15 +137,39 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
     });
   }
 
-  // 默认启动流程：优先走官方直连，如果是 iOS，直连大概率失败，降级逻辑会捕获
-  GM.fetchJson(GM.ITUNES_HOSTS[1] + query, function (err, data) {
-    if (err) { 
-      // 直连失败，走我们的 Functions 代理
-      tryFunctionsProxy(); 
-      return; 
+  // 判断是否为移动端设备（包含 iOS 和 Android，以及 iPadOS）
+  var isMobile = /iPhone|iPad|iPod|Android|Mobi/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  if (isMobile) {
+    // 移动端（特别是 iOS）极易触发 Universal Links 拦截，导致跳出浏览器或请求挂起
+    // 因此移动端直接使用 Functions 代理，若失败则降级到公共 CORS 代理，彻底避开直连 itunes.apple.com
+    function mobileFunctionsProxy() {
+      var apiUrl = "/api/search?term=" + encodeURIComponent(name);
+      fetch(apiUrl)
+        .then(function(res) {
+          if (!res.ok) throw new Error("Functions API Error");
+          return res.json();
+        })
+        .then(function(data) {
+          onData(data);
+        })
+        .catch(function(e) {
+          console.warn("Functions 代理失败，降级到公共 CORS 代理:", e);
+          tryProxy();
+        });
     }
-    onData(data);
-  });
+    mobileFunctionsProxy();
+  } else {
+    // 默认启动流程：PC 端优先走官方直连，失败再走代理
+    GM.fetchJson(GM.ITUNES_HOSTS[1] + query, function (err, data) {
+      if (err) { 
+        // 直连失败，走我们的 Functions 代理
+        tryFunctionsProxy(); 
+        return; 
+      }
+      onData(data);
+    });
+  }
 };
 
 /* ===== 提取封面通用逻辑 ===== */
