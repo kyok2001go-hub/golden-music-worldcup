@@ -2,39 +2,68 @@
 var GM = window.GM = window.GM || {};
 
 GM.CORS_PROXY = "https://api.allorigins.win/raw?url=";
-GM.ITUNES_HOSTS = ["https://itunes.apple.com.cn", "https://itunes.apple.com"];
+GM.BASE_URL = "https://itunes.apple.com"; // 修复1：抛弃 .com.cn，统一使用全球主域名规避强拦截
 
-/* ===== JSONP 请求 ===== */
-GM.jsonp = function (url, cb) {
-  var cbName = "__itunesCb" + (GM._jsonpSeq = (GM._jsonpSeq || 0) + 1);
-  var script = document.createElement("script");
-  var done = false;
-  function cleanup() {
-    try { delete window[cbName]; } catch (e) { window[cbName] = undefined; }
-    if (script.parentNode) script.parentNode.removeChild(script);
+GM._jsonpMode = false; // 全局标记：一旦 fetch 被拦截（如 iOS），后续全走 JSONP
+GM._jsonpSeq = 0;
+
+/* ===== 高度封装的统一请求 (Fetch 优先，失败秒切 JSONP) ===== */
+GM.get = async function(url) {
+  if (!GM._jsonpMode && window.fetch) {
+    try {
+      var ctrl = new AbortController();
+      // 修复3：9秒超时物理斩断，防止 iOS 遇到拦截时挂起请求导致假死
+      var timer = setTimeout(function() { ctrl.abort(); }, 9000); 
+      try {
+        var response = await fetch(url, { signal: ctrl.signal });
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        return await response.json();
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch (error) {
+      // 修复4：只要 fetch 失败（被 iOS 拦截抛出 CORS 或中止），立即全局切为 JSONP
+      console.warn("Fetch 失败 (可能被 iOS 拦截)，切换到 JSONP 模式:", error);
+      GM._jsonpMode = true; 
+    }
   }
-  var timer = setTimeout(function () {
-    if (done) return; done = true;
-    cleanup();
-    cb(new Error("请求超时"));
-  }, 12000);
-  window[cbName] = function (data) {
-    if (done) return; done = true;
-    clearTimeout(timer);
-    cleanup();
-    cb(null, data);
-  };
-  script.onerror = function () {
-    if (done) return; done = true;
-    clearTimeout(timer);
-    cleanup();
-    cb(new Error("网络请求失败"));
-  };
-  script.src = url + (url.indexOf("?") > -1 ? "&" : "?") + "callback=" + cbName;
-  document.body.appendChild(script);
+  
+  // JSONP 兜底（直接生成 script 标签，完美规避 iOS Universal Links 拦截）
+  return new Promise(function(resolve, reject) {
+    var cbName = "__itunesCb" + (++GM._jsonpSeq);
+    var script = document.createElement("script");
+    var done = false;
+    
+    var timer = setTimeout(function() {
+      if (done) return; done = true;
+      cleanup();
+      reject(new Error("JSONP Timeout"));
+    }, 12000);
+    
+    function cleanup() {
+      clearTimeout(timer);
+      try { delete window[cbName]; } catch (e) { window[cbName] = undefined; }
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+    
+    window[cbName] = function(data) {
+      if (done) return; done = true;
+      cleanup();
+      resolve(data);
+    };
+    
+    script.onerror = function() {
+      if (done) return; done = true;
+      cleanup();
+      reject(new Error("JSONP Failed"));
+    };
+    
+    script.src = url + (url.indexOf("?") > -1 ? "&" : "?") + "callback=" + cbName;
+    document.body.appendChild(script); 
+  });
 };
 
-/* ===== Fetch 请求 ===== */
+/* ===== 旧的通用 Fetch 请求 (保留给 CORS 代理兜底用) ===== */
 GM.fetchJson = function (url, cb) {
   if (!window.fetch) { cb(new Error("no fetch")); return; }
   var timer = setTimeout(function () { cb(new Error("请求超时")); }, 12000);
@@ -88,11 +117,10 @@ GM.handleSongs = function (name, data) {
 };
 
 /* ===== 核心获取歌手歌曲 ===== */
-/* ===== 核心获取歌手歌曲 ===== */
-GM._jsonpMode = false;
-
 GM.coreFetchArtist = function (name, onSuccess, onFail) {
-  var query = "/search?term=" + encodeURIComponent(name) + "&entity=song&attribute=artistTerm&limit=200&country=CN&media=music";
+  // 修复2：关键移除容易触发 Apple Music 唤醒的 &media=music 参数，仅保留 entity=song
+  var query = "/search?term=" + encodeURIComponent(name) + "&entity=song&attribute=artistTerm&limit=200&country=CN";
+  var targetUrl = GM.BASE_URL + query;
   
   function onData(data) {
     var res = GM.handleSongs(name, data);
@@ -107,68 +135,15 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
     onFail("获取失败：无法连接歌曲服务，请换个网络环境再试，或到电脑端使用该功能");
   }
 
-  // ==== 新增：环境检测工具函数 ====
-  function isIOS() {
-    // 兼容传统的 iPhone/iPad 以及 iPadOS（伪装成Mac但支持触控）
-    return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  }
-
-  // ==== 智能请求：修改后的逻辑 ====
-  function smartGet(hostIdx) {
-    // 核心修复：如果是 iOS 设备，直接跳过官方直连，强制使用 Cloudflare 代理！
-    // 避免触发底层的 Universal Links 拉起 Apple Music
-    if (isIOS()) {
+  // 使用封装好的 GM.get，它会自动处理 iOS 拦截并实现 Fetch 到 JSONP 的无缝降级
+  GM.get(targetUrl)
+    .then(function(data) {
+      onData(data);
+    })
+    .catch(function(e) {
+      console.warn("官方直连与 JSONP 均失败，启用 Functions 代理兜底", e);
       tryFunctionsProxy();
-      return;
-    }
-
-    if (hostIdx >= GM.ITUNES_HOSTS.length) {
-      // 非 iOS 设备官方直连和 JSONP 都失败，走代理兜底
-      tryFunctionsProxy();
-      return;
-    }
-    
-    var url = GM.ITUNES_HOSTS[hostIdx] + query;
-    
-    if (!GM._jsonpMode && window.fetch) {
-      var done = false;
-      var timer = setTimeout(function() {
-        if (done) return; done = true;
-        GM._jsonpMode = true;
-        tryJsonp(hostIdx);
-      }, 8000); 
-      
-      fetch(url)
-        .then(function(res) {
-          if (done) return; done = true;
-          clearTimeout(timer);
-          if (!res.ok) throw new Error("HTTP " + res.status);
-          return res.json();
-        })
-        .then(function(data) {
-          onData(data);
-        })
-        .catch(function(e) {
-          if (done) return; done = true;
-          clearTimeout(timer);
-          GM._jsonpMode = true;
-          tryJsonp(hostIdx);
-        });
-    } else {
-      tryJsonp(hostIdx);
-    }
-  }
-
-  function tryJsonp(idx) {
-    GM.jsonp(GM.ITUNES_HOSTS[idx] + query, function (err, data) {
-      if (err) {
-        smartGet(idx + 1);
-      } else {
-        onData(data);
-      }
     });
-  }
 
   function tryFunctionsProxy() {
     var apiUrl = "/api/search?term=" + encodeURIComponent(name);
@@ -181,20 +156,17 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
         onData(data);
       })
       .catch(function(e) {
-        console.warn("Functions 代理失败，降级到公共 CORS 代理:", e);
+        console.warn("Functions 代理失败，最后降级到公共 CORS 代理:", e);
         tryProxy();
       });
   }
 
   function tryProxy() {
-    GM.fetchJson(GM.CORS_PROXY + encodeURIComponent(GM.ITUNES_HOSTS[1] + query), function (err, data) {
+    GM.fetchJson(GM.CORS_PROXY + encodeURIComponent(targetUrl), function (err, data) {
       if (err) { failAll(); return; }
       onData(data);
     });
   }
-
-  // 默认启动流程
-  smartGet(1);
 };
 
 /* ===== 提取封面通用逻辑 ===== */
