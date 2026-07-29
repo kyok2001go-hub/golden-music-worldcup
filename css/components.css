@@ -15,10 +15,10 @@
 
 .size-select {
   appearance: none; -webkit-appearance: none;
-  padding: 6px 24px 6px 14px !important;
-  background-image: url('data:image/svg+xml;utf8,%3Csvg%20fill%3D%27%23dfe3f5%27%20height%3D%2716%27%20viewBox%3D%270%200%2024%2024%27%20width%3D%2716%27%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%3E%3Cpath%20d%3D%27M7%2010l5%205%205-5z%27%2F%3E%3C%2Fsvg%3E');
+  padding: 6px 28px 6px 14px !important;
+  background-image: url("data:image/svg+xml;utf8,<svg fill='%23dfe3f5' height='20' viewBox='0 0 24 24' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
   background-repeat: no-repeat;
-  background-position: right 8px center !important;
+  background-position: right 4px center !important;
   cursor: pointer;
   font-family: inherit; font-weight: 700;
   text-align: center; text-align-last: center;
@@ -78,6 +78,15 @@
 .qs-btn-act.secondary { background: var(--theme-btn-secondary, rgba(255,255,255,.1)); color: #fff; }
 .qs-btn-act.primary { background: var(--theme-btn-primary, #5b6fc4); color: #fff; box-shadow: 0 4px 12px var(--theme-primary-shadow, rgba(91,111,196,.4)); }
 
+/* 仅图标操作按钮（关闭） */
+.qs-btn-act.icon-only {
+  flex: 0 0 44px; max-width: 44px;
+  background: var(--theme-btn-secondary, rgba(255,255,255,0.1));
+  color: rgba(255,255,255,0.6); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: bold;
+}
+
 .qs-r-reselect { background: rgba(255,255,255,.08); border: none; color: #dfe3f5; padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; transition: background 0.15s; }
 .qs-r-reselect:active { transform: scale(0.95); }
 
@@ -85,6 +94,7 @@
   .qs-r-reselect:hover { background: rgba(255,255,255,.16); }
   .qs-btn-act.secondary:hover { background: var(--theme-btn-secondary-hover, rgba(255,255,255,.15)); }
   .qs-btn-act.primary:hover { background: var(--theme-btn-primary-hover, #6e81d6); }
+  .qs-btn-act.icon-only:hover { background: var(--theme-btn-secondary-hover, rgba(255,255,255,0.16)); color: #fff; }
 }
 
 /* ===== 对阵图节点卡片 ===== */
@@ -243,12 +253,6 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
   .vs-progress-track { bottom: 24px; }
 }
 
-/* 移动端工具栏按钮 */
-@media (max-width: 640px) {
-  .toolbar .btn { flex: 1 1 calc(50% - 6px); padding: 9px 8px; font-size: 13px; }
-  .size-select { font-size: 13px !important; padding: 9px 18px 9px 12px !important; background-position: right 6px center !important; }
-}
-
 /* ===== 批量录入弹窗 ===== */
 .modal { width: 100%; max-width: 560px; max-height: 86vh; background: #130E18; border: 1px solid rgba(255,255,255,.16); border-radius: 10px; box-shadow: 0 16px 48px rgba(5, 8, 25, .55); display: flex; flex-direction: column; overflow: hidden; }
 .modal-head { background: rgba(255,255,255,.07); border-bottom: 1px solid rgba(255,255,255,.12); color: #f0f1f8; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 700; }
@@ -300,3 +304,172 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
   box-shadow: 0 10px 30px rgba(0,0,0,0.6); text-align: center;
 }
 .toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+/* ===== 2.3.4 自选歌曲沉浸式弹窗 (去除阴影、提亮主题色) ===== */
+.select-mask {
+  position: fixed; inset: 0; z-index: 2100; display: none; align-items: center; justify-content: center;
+  background: rgba(8, 10, 20, 0.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
+.select-mask.show { display: flex; }
+
+.select-box {
+  width: 100%; max-width: 680px; height: 86vh; 
+  /* 灰白边框及背景渐变 */
+  border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 16px; overflow: hidden;
+  background: linear-gradient(to bottom, var(--theme-vqs-start, #130E18) 0%, #0d0a14 100%);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, .8); display: flex; flex-direction: column;
+}
+
+.select-head { 
+  padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); 
+  flex: 0 0 auto; background: rgba(0,0,0,0.35); position: relative; z-index: 10;
+}
+.select-head-top { 
+  position: relative; display: flex; justify-content: center; align-items: center; margin-bottom: 12px; 
+}
+.select-title { font-size: 18px; font-weight: 700; color: #fff; text-align: center; }
+.select-close { 
+  position: absolute; right: 0; font-size: 22px; color: rgba(255,255,255,0.5); 
+  cursor: pointer; padding: 0 4px; line-height: 1; 
+}
+.select-close:hover { color: #fff; }
+
+.select-head-tools { display: flex; gap: 10px; }
+
+/* 统一下拉框原生 SVG 箭头与内边距修复 */
+.select-size-dropdown {
+  appearance: none; -webkit-appearance: none;
+  background-color: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); 
+  border-radius: 8px; padding: 8px 30px 8px 12px; outline: none; font-weight: 700; cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg fill='%23fff' height='20' viewBox='0 0 24 24' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+  background-repeat: no-repeat; background-position: right 6px center;
+}
+.select-size-dropdown option { background: #130E18; }
+
+.select-search { flex: 1; position: relative; }
+.select-search input { 
+  width: 100%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); 
+  border-radius: 8px; padding: 8px 32px 8px 12px; color: #fff; outline: none; transition: border 0.2s;
+}
+.select-search input:focus { border-color: var(--theme-btn-primary, #5b6fc4); }
+.select-search-clear { 
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%); 
+  color: rgba(255,255,255,0.6); cursor: pointer; font-size: 14px; padding: 4px; 
+}
+.select-search-clear:hover { color: #fff; }
+
+/* 排序与清空纯文字工具栏 */
+.select-sub-tools { 
+  display: flex; justify-content: space-between; align-items: center; margin-top: 12px; 
+}
+.select-sort-dropdown { 
+  appearance: none; -webkit-appearance: none;
+  background-color: transparent; color: rgba(255,255,255,0.7); border: none; 
+  padding: 6px 20px 6px 0; outline: none; font-weight: 400; font-size: 13px; cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg fill='rgba(255,255,255,0.5)' height='18' viewBox='0 0 24 24' width='18' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+  background-repeat: no-repeat; background-position: right center;
+}
+.select-sort-dropdown option { background: #130E18; color: #fff; }
+
+.select-btn-clear { 
+  background: transparent; border: none; color: #ff8a7e; 
+  padding: 6px 0; font-size: 13px; cursor: pointer; transition: color 0.15s; 
+}
+.select-btn-clear:hover { color: #ff5340; }
+
+/* 列表渲染与年代分组 */
+.select-body { 
+  flex: 1; overflow-y: auto; padding: 20px; 
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); 
+  gap: 12px; align-content: start; -webkit-overflow-scrolling: touch;
+}
+.sel-year-header {
+  grid-column: 1 / -1; 
+  /* V2.3.4: 提亮颜色，使用 filter */
+  color: var(--theme-btn-primary, #5b6fc4); 
+  filter: brightness(1.2) saturate(1.1);
+  font-size: 16px; font-weight: 800; 
+  padding-top: 16px; padding-bottom: 4px; letter-spacing: 1px;
+  border-bottom: none; 
+}
+
+/* 卡片样式，Flex布局 */
+.select-card {
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; 
+  padding: 12px; cursor: pointer; position: relative; transition: all 0.15s; user-select: none;
+  display: flex; flex-direction: column; justify-content: space-between;
+  min-height: 84px;
+}
+/* V2.3.4: 选中态取消背景色变化，边框使用提亮后的开始对阵色，并去除阴影(box-shadow) */
+.select-card.selected { 
+  border-color: var(--theme-btn-primary, #5b6fc4); 
+  filter: brightness(1.2) saturate(1.1);
+  box-shadow: none; /* 移除阴影 */
+}
+@media (hover: hover) and (pointer: fine) {
+  .select-card:hover { background: rgba(255,255,255,0.1); }
+}
+.select-card:active { transform: scale(0.97); }
+
+.sel-name { 
+  font-size: 14.5px; font-weight: 600; color: #f0f1f8; margin-bottom: 8px; 
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; 
+  overflow: hidden; line-height: 1.4; transition: color 0.15s;
+  flex: 1; 
+}
+/* V2.3.4: 选中态高亮歌曲名，去除阴影 */
+.select-card.selected .sel-name { 
+  color: var(--theme-btn-primary, #5b6fc4); font-weight: 700; 
+  text-shadow: none; /* 移除阴影 */
+}
+
+.sel-card-bottom {
+  display: flex; justify-content: space-between; align-items: center;
+}
+.sel-year { font-size: 12px; color: rgba(255,255,255,0.4); }
+
+.sel-check { 
+  width: 18px; height: 18px; 
+  border-radius: 50%; border: 1px solid rgba(255,255,255,0.3); display: flex; 
+  align-items: center; justify-content: center; font-size: 10px; color: transparent; 
+  transition: all 0.2s;
+}
+/* V2.3.4: 选中态勾选项 */
+.select-card.selected .sel-check { 
+  background: var(--theme-btn-primary, #5b6fc4); 
+  border-color: var(--theme-btn-primary, #5b6fc4); color: #fff; 
+}
+
+/* 底部按钮及蒙层主题跟随 */
+.select-foot { 
+  flex: 0 0 auto; padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.1); 
+  background: var(--theme-action-bg, rgba(19, 14, 24, 0.85)); 
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  display: flex; justify-content: center; align-items: center; gap: 24px;
+}
+.select-btn-rand, .select-btn-submit { min-width: 140px; text-align: center; }
+.select-btn-rand { 
+  background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.1); padding: 10px 20px; 
+  border-radius: 999px; font-size: 14px; cursor: pointer; transition: background 0.15s; font-weight: 700;
+}
+.select-btn-rand:active { transform: scale(0.96); }
+.select-btn-submit { 
+  background: var(--theme-btn-primary, #5b6fc4); color: #fff; border: none; 
+  padding: 10px 32px; border-radius: 999px; font-size: 14.5px; font-weight: bold; 
+  cursor: pointer; transition: opacity 0.2s, transform 0.1s; box-shadow: 0 4px 12px rgba(91, 111, 196, .4);
+}
+.select-btn-submit:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+.select-btn-submit:not(:disabled):active { transform: scale(0.96); }
+
+/* 移动端全屏自适应及 3列 高密度排版优化 */
+@media (max-width: 640px) {
+  .select-box { height: 100%; max-height: 100vh; border-radius: 0; border: none; }
+  .select-body { grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 12px; }
+  .select-card { padding: 10px; min-height: 74px; }
+  .sel-name { font-size: 12px; line-height: 1.35; margin-bottom: 6px;}
+  .sel-year { font-size: 10px; }
+  .sel-check { width: 14px; height: 14px; font-size: 9px; }
+  
+  .qs-btn-act.icon-only { flex: 0 0 40px; height: 40px; } 
+  .select-btn-rand, .select-btn-submit { min-width: 120px; }
+}

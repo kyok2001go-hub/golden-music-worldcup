@@ -34,14 +34,11 @@ var GM = window.GM = window.GM || {};
   /* ===== 对阵选择弹窗 ===== */
   var vsMask = document.getElementById("vsMask");
   var vsTitle = document.getElementById("vsTitle");
-  var vsCardA = document.getElementById("vsCardA");
-  var vsCardB = document.getElementById("vsCardB");
   var vsClear = document.getElementById("vsClear");
   var vsContinuous = document.getElementById("vsContinuous");
   var vsHint = document.getElementById("vsHint");
   var vsR = 0, vsI = 0;
   var isPicking = false;
-
   var vsTimerInterval = null;
   var vsTimerSeconds = 0;
 
@@ -165,14 +162,12 @@ var GM = window.GM = window.GM || {};
     renderVsCards();
     updateVsProgress();
     vsMask.classList.add("show");
-
     startVsTimer();
   }
 
   function pickWinner(value, cardEl) {
     if (!value || isPicking) return;
     if (GM.state.winners[vsR][vsI] !== null) return;
-
     isPicking = true;
     cardEl.classList.add("picked");
 
@@ -197,12 +192,10 @@ var GM = window.GM = window.GM || {};
       }
 
       isPicking = false;
-
       if (isFinal) {
         var vsBoxEl = document.querySelector("#vsMask .vs-box");
         vsBoxEl.style.display = "none";
         vsMask.style.pointerEvents = "none";
-
         setTimeout(function () {
           showResultModal();
           vsMask.classList.remove("show");
@@ -212,16 +205,13 @@ var GM = window.GM = window.GM || {};
         }, 300);
       } else {
         closePopup();
-        if (vsContinuous.checked) {
-          GM.toast("已全部对阵完毕");
-        }
+        if (vsContinuous.checked) GM.toast("已全部对阵完毕");
       }
     }, 300);
   }
 
   document.getElementById("vsCardA").addEventListener("click", function () { pickWinner(GM.getSources(vsR, vsI)[0], document.getElementById("vsCardA")); });
   document.getElementById("vsCardB").addEventListener("click", function () { pickWinner(GM.getSources(vsR, vsI)[1], document.getElementById("vsCardB")); });
-
   vsClear.addEventListener("click", function () {
     if (GM.state.winners[vsR][vsI] === null) return;
     GM.clearNode(vsR, vsI);
@@ -229,7 +219,6 @@ var GM = window.GM = window.GM || {};
     renderVsCards();
     updateVsProgress();
   });
-
   document.getElementById("vsClose").addEventListener("click", closePopup);
   vsMask.addEventListener("click", function (e) { if (e.target === vsMask) closePopup(); });
 
@@ -263,11 +252,9 @@ var GM = window.GM = window.GM || {};
   function showResultModal() {
     var champ = GM.state.winners[GM.lastR()][0];
     if (!champ) return;
-
     var final_0 = GM.state.winners[GM.lastR() - 1][0];
     var final_1 = GM.state.winners[GM.lastR() - 1][1];
     var runnerUp = (final_0 === champ) ? final_1 : final_0;
-
     var s0 = GM.state.winners[GM.lastR() - 2][0];
     var s1 = GM.state.winners[GM.lastR() - 2][1];
     var s2 = GM.state.winners[GM.lastR() - 2][2];
@@ -275,9 +262,7 @@ var GM = window.GM = window.GM || {};
     var semis = [s0, s1, s2, s3];
     var top4 = [];
     for (var i = 0; i < semis.length; i++) {
-      if (semis[i] && semis[i] !== final_0 && semis[i] !== final_1) {
-        top4.push(semis[i]);
-      }
+      if (semis[i] && semis[i] !== final_0 && semis[i] !== final_1) top4.push(semis[i]);
     }
 
     document.getElementById("resChampName").textContent = champ;
@@ -296,7 +281,6 @@ var GM = window.GM = window.GM || {};
       var opp = isSrc0 ? srcs[1] : srcs[0];
       var rName = GM.SIZE_CONFIG[GM.seeds()].roundNames[r];
       if (r === GM.lastR()) rName = "决赛";
-
       roadData.unshift({ rName: rName, opp: opp });
       curIdx = isSrc0 ? 2 * curIdx : 2 * curIdx + 1;
     }
@@ -320,14 +304,10 @@ var GM = window.GM = window.GM || {};
     var i = +cell.getAttribute("data-i");
     openPopup(r, i, cell);
   });
-
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePopup(); });
   window.addEventListener("resize", function () {
-    if (document.getElementById("viewBracket").style.display === "block") {
-      GM.drawConnectors();
-    }
+    if (document.getElementById("viewBracket").style.display === "block") GM.drawConnectors();
   });
-
   document.getElementById("titleInput").addEventListener("input", function (e) {
     GM.state.title = e.target.value;
     GM.save();
@@ -349,12 +329,10 @@ var GM = window.GM = window.GM || {};
     }
     return items;
   }
-
   function updateBatchCount() {
     var n = parseBatchText(batchArea.value).length;
     batchCount.textContent = "已识别 " + n + " 项" + (n > 0 ? "（将填入第 1~" + n + " 项）" : "");
   }
-
   function openBatchModal() {
     var existing = [];
     for (var i = 0; i < GM.seeds(); i++) existing.push(GM.state.inputs[i] || "");
@@ -363,15 +341,11 @@ var GM = window.GM = window.GM || {};
     batchMask.classList.add("show");
     batchArea.focus();
   }
-
-  function closeBatchModal() {
-    batchMask.classList.remove("show");
-  }
+  function closeBatchModal() { batchMask.classList.remove("show"); }
 
   function applyBatch() {
     batchArea.blur();
     var items = parseBatchText(batchArea.value);
-
     var arr = new Array(GM.seeds()).fill("");
     for (var i = 0; i < items.length; i++) {
       arr[i] = items[i];
@@ -383,6 +357,7 @@ var GM = window.GM = window.GM || {};
     GM.state.inputs = arr;
     GM.state.covers = [];
     GM.state.avgColor = null;
+    GM.state.allFetchedSongs = []; // 手动批量录入时清空缓存歌曲
     GM.clearAllWinners();
     var inputs = GM.tbody.querySelectorAll("input[data-idx]");
     for (var k = 0; k < inputs.length; k++) inputs[k].value = GM.state.inputs[k];
@@ -395,7 +370,6 @@ var GM = window.GM = window.GM || {};
     closeArtistModal();
     openBatchModal();
   });
-
   document.getElementById("btnMore").addEventListener("click", function () {
     var tb = document.querySelector(".toolbar");
     tb.classList.toggle("expanded");
@@ -404,16 +378,11 @@ var GM = window.GM = window.GM || {};
   document.getElementById("batchClose").addEventListener("click", closeBatchModal);
   document.getElementById("btnBatchApply").addEventListener("click", applyBatch);
   batchArea.addEventListener("input", updateBatchCount);
-  batchMask.addEventListener("click", function (e) {
-    if (e.target === batchMask) closeBatchModal();
-  });
+  batchMask.addEventListener("click", function (e) { if (e.target === batchMask) closeBatchModal(); });
   document.getElementById("btnBatchDemo").addEventListener("click", function () {
     batchArea.value = GM.DEMO.join("\n");
     updateBatchCount();
     batchArea.focus();
-  });
-  document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && batchMask.classList.contains("show")) closeBatchModal();
   });
 
   /* ===== 视图1：快速开始逻辑 ===== */
@@ -425,11 +394,9 @@ var GM = window.GM = window.GM || {};
   function doQuickFetch() {
     var name = qsSearchInput.value.replace(/^\s+|\s+$/g, "");
     if (!name) { GM.toast("请输入歌手名称"); qsSearchInput.focus(); return; }
-
     qsSearchInput.blur();
-
     var sz = parseInt(qsSizeSelect.value);
-    if (sz !== GM.state.size) { setSize(sz); }
+    if (sz !== GM.state.size) setSize(sz);
 
     qsSearchInput.disabled = true;
     qsSizeSelect.disabled = true;
@@ -445,10 +412,13 @@ var GM = window.GM = window.GM || {};
 
     GM.coreFetchArtist(name, function (res) {
       resetLoading();
+      
+      GM.state.allFetchedSongs = res.songs; 
       var arr = new Array(GM.seeds()).fill("");
-      for (var i = 0; i < res.songs.length; i++) arr[i] = res.songs[i];
+      for (var i = 0; i < Math.min(res.songs.length, GM.seeds()); i++) {
+        arr[i] = res.songs[i];
+      }
       GM.state.inputs = arr;
-
       GM.state.title = name;
       document.getElementById("titleInput").value = name;
       GM.state.covers = GM.extractCoversFromApiRes(res);
@@ -459,7 +429,7 @@ var GM = window.GM = window.GM || {};
       var inputs = GM.tbody.querySelectorAll("input[data-idx]");
       for (var q = 0; q < inputs.length; q++) inputs[q].value = GM.state.inputs[q];
       GM.save(); GM.render();
-      GM.toast("已为您生成对决列表", 1500);
+      GM.toast("已为您生成对决列表，可点击上方「自选歌曲」换歌", 2500);
     }, function (errMsg) {
       resetLoading();
       document.getElementById("artistInput").value = name;
@@ -479,10 +449,11 @@ var GM = window.GM = window.GM || {};
     doQuickFetch();
   });
 
-  document.getElementById("qsBtnReselect").addEventListener("click", function () {
+  function executeReset() {
     GM.state.inputs = new Array(GM.seeds()).fill("");
     GM.state.covers = [];
     GM.state.avgColor = null;
+    GM.state.allFetchedSongs = [];
     GM.state.title = "金曲世界杯";
     document.getElementById("titleInput").value = GM.state.title;
     GM.clearAllWinners();
@@ -490,7 +461,9 @@ var GM = window.GM = window.GM || {};
     for (var k = 0; k < inputs.length; k++) inputs[k].value = "";
     qsSearchInput.value = "";
     GM.save(); GM.render();
-  });
+  }
+  document.getElementById("qsBtnReset1").addEventListener("click", executeReset);
+  document.getElementById("qsBtnReset2").addEventListener("click", executeReset);
 
   document.getElementById("qsBtnStartMatch").addEventListener("click", function () {
     var nxt = findFirstUnplayedMatch();
@@ -513,12 +486,10 @@ var GM = window.GM = window.GM || {};
   function openArtistModal() {
     artistStatus.textContent = "";
     artistStatus.className = "artist-status";
-    document.getElementById("artistTip").style.display = "block";
     artistMask.classList.add("show");
     artistInput.focus();
   }
   function closeArtistModal() { artistMask.classList.remove("show"); }
-
   function setArtistStatus(msg, type) {
     artistStatus.textContent = msg;
     artistStatus.className = "artist-status" + (type ? " " + type : "");
@@ -529,17 +500,18 @@ var GM = window.GM = window.GM || {};
     if (!name) { setArtistStatus("请输入歌手名字", "err"); artistInput.focus(); return; }
 
     btnFetchArtist.disabled = true;
-    document.getElementById("artistTip").style.display = "none";
     setArtistStatus("正在获取「" + name + "」的热门歌曲…");
 
     GM.coreFetchArtist(name, function (res) {
       btnFetchArtist.disabled = false;
-      setArtistStatus("已获取 " + res.songs.length + " 首，正在导入…", "ok");
+      setArtistStatus("已获取，正在导入…", "ok");
       setTimeout(function () {
+        GM.state.allFetchedSongs = res.songs;
         var arr = new Array(GM.seeds()).fill("");
-        for (var i = 0; i < res.songs.length; i++) arr[i] = res.songs[i];
+        for (var i = 0; i < Math.min(res.songs.length, GM.seeds()); i++) {
+          arr[i] = res.songs[i];
+        }
         GM.state.inputs = arr;
-
         GM.state.title = name;
         document.getElementById("titleInput").value = name;
         GM.state.covers = GM.extractCoversFromApiRes(res);
@@ -551,15 +523,13 @@ var GM = window.GM = window.GM || {};
         for (var q = 0; q < inputs.length; q++) inputs[q].value = GM.state.inputs[q];
         GM.save(); GM.render();
         closeArtistModal();
-        GM.toast("已成功导入并重置对阵图");
+        GM.toast("已为您生成对决列表，可点击上方「自选歌曲」换歌");
       }, 350);
     }, function (err) {
       btnFetchArtist.disabled = false;
-      document.getElementById("artistTip").style.display = "block";
       setArtistStatus(err, "err");
     });
   }
-
   document.getElementById("btnImportArtist").addEventListener("click", openArtistModal);
   document.getElementById("artistClose").addEventListener("click", closeArtistModal);
   btnFetchArtist.addEventListener("click", fetchArtistSongsOld);
@@ -576,12 +546,207 @@ var GM = window.GM = window.GM || {};
     if (e.target === artistMask) closeArtistModal();
   });
 
-  /* ===== 视图切换按钮 ===== */
+
+  /* ===== V2.3.2 自选歌曲完整分组交互优化逻辑 ===== */
+  var selectMask = document.getElementById("selectMask");
+  var selectBody = document.getElementById("selectBody");
+  var selectSearchInput = document.getElementById("selectSearchInput");
+  var selectSearchClear = document.getElementById("selectSearchClear");
+  var selectSizeDropdown = document.getElementById("selectSizeDropdown");
+  var selectSortDropdown = document.getElementById("selectSortDropdown");
+  var selectBtnClear = document.getElementById("selectBtnClear");
+  var selectBtnSubmit = document.getElementById("selectBtnSubmit");
+  
+  var currentSelectSize = GM.seeds();
+  var tempSelectedSongs = [];
+
+  function openSelectModal() {
+    if (!GM.state.allFetchedSongs || GM.state.allFetchedSongs.length === 0) {
+      GM.toast("当前未缓存该歌手更多歌曲，请重新搜索并导入");
+      return;
+    }
+    currentSelectSize = GM.seeds();
+    selectSizeDropdown.value = currentSelectSize;
+    selectSortDropdown.value = "default";
+    selectSearchInput.value = "";
+    selectSearchClear.style.display = "none";
+    tempSelectedSongs = GM.state.inputs.filter(function(s) { return s.trim() !== ""; });
+    
+    renderSelectList();
+    selectMask.classList.add("show");
+  }
+
+  function renderSelectList() {
+    var kw = selectSearchInput.value.trim().toLowerCase();
+    var sortType = selectSortDropdown.value; 
+    var rawSongs = GM.state.allFetchedSongs || [];
+    var listToRender = [];
+    
+    // 构建含排序因子的列表
+    for (var i = 0; i < rawSongs.length; i++) {
+      var s = rawSongs[i];
+      if (kw && s.toLowerCase().indexOf(kw) === -1) continue;
+      
+      var meta = GM.state.meta[s] || {};
+      var year = meta.releaseDate ? meta.releaseDate.substring(0, 4) : "未知";
+      var sortYear = year === "未知" ? 9999 : parseInt(year);
+      
+      listToRender.push({
+        name: s,
+        year: year,
+        sortYear: sortYear,
+        originalIndex: i
+      });
+    }
+    
+    // 排序处理
+    if (sortType === "asc") {
+      listToRender.sort(function(a, b) {
+        if (a.sortYear !== b.sortYear) return a.sortYear - b.sortYear;
+        return a.originalIndex - b.originalIndex;
+      });
+    } else if (sortType === "desc") {
+      listToRender.sort(function(a, b) {
+        if (a.sortYear !== b.sortYear) {
+          if (a.sortYear === 9999) return 1; // 未知年份始终垫底
+          if (b.sortYear === 9999) return -1;
+          return b.sortYear - a.sortYear;
+        }
+        return a.originalIndex - b.originalIndex;
+      });
+    }
+    
+    var html = "";
+    var currentYear = null;
+    
+    for (var j = 0; j < listToRender.length; j++) {
+      var item = listToRender[j];
+      
+      // 年代分组标题逻辑
+      if (sortType !== "default" && item.year !== currentYear) {
+         currentYear = item.year;
+         html += '<div class="sel-year-header">' + currentYear + (currentYear !== "未知" ? " 年" : "年份") + '</div>';
+      }
+      
+      var isSelected = tempSelectedSongs.indexOf(item.name) !== -1;
+      var cls = "select-card" + (isSelected ? " selected" : "");
+      
+      // 2.3.2 优化：使用 sel-card-bottom 容器强制保证 年代字段 和 勾选项在底部两端对齐
+      html += '<div class="' + cls + '" data-song="' + GM.esc(item.name) + '">';
+      html += '<div class="sel-name" title="' + GM.esc(item.name) + '">' + GM.esc(item.name) + '</div>';
+      html += '<div class="sel-card-bottom">';
+      html += '<div class="sel-year">' + item.year + '</div>';
+      html += '<div class="sel-check">✓</div>';
+      html += '</div>';
+      html += '</div>';
+    }
+    
+    selectBody.innerHTML = html || '<div style="color: rgba(255,255,255,0.4); text-align: center; grid-column: 1/-1; padding-top: 40px;">暂无匹配歌曲</div>';
+    
+    if (tempSelectedSongs.length < currentSelectSize) {
+      selectBtnSubmit.disabled = true;
+      selectBtnSubmit.textContent = "已选 " + tempSelectedSongs.length + " / " + currentSelectSize;
+    } else {
+      selectBtnSubmit.disabled = false;
+      selectBtnSubmit.textContent = "确认";
+    }
+  }
+
+  selectBody.addEventListener("click", function(e) {
+    var card = e.target.closest(".select-card");
+    if (!card) return;
+    var s = card.getAttribute("data-song");
+    var idx = tempSelectedSongs.indexOf(s);
+    
+    if (idx !== -1) {
+      tempSelectedSongs.splice(idx, 1);
+    } else {
+      if (tempSelectedSongs.length >= currentSelectSize) {
+        GM.toast("最多选择 " + currentSelectSize + " 个");
+        return;
+      }
+      tempSelectedSongs.push(s);
+    }
+    renderSelectList();
+  });
+
+  selectSizeDropdown.addEventListener("change", function(e) {
+    currentSelectSize = parseInt(e.target.value);
+    tempSelectedSongs = [];
+    var songs = GM.state.allFetchedSongs || [];
+    for (var i = 0; i < Math.min(songs.length, currentSelectSize); i++) {
+      tempSelectedSongs.push(songs[i]);
+    }
+    GM.toast("选手数量已切换为 " + currentSelectSize + " 个");
+    renderSelectList();
+  });
+  
+  selectSortDropdown.addEventListener("change", renderSelectList);
+  
+  selectBtnClear.addEventListener("click", function() {
+    tempSelectedSongs = [];
+    renderSelectList();
+  });
+
+  selectSearchInput.addEventListener("input", function() {
+    selectSearchClear.style.display = this.value ? "block" : "none";
+    renderSelectList();
+  });
+  selectSearchClear.addEventListener("click", function() {
+    selectSearchInput.value = "";
+    this.style.display = "none";
+    renderSelectList();
+  });
+
+  document.getElementById("selectBtnRand").addEventListener("click", function() {
+    var songs = (GM.state.allFetchedSongs || []).slice();
+    for (var k = songs.length - 1; k > 0; k--) {
+      var j = Math.floor(Math.random() * (k + 1));
+      var tmp = songs[k]; songs[k] = songs[j]; songs[j] = tmp;
+    }
+    tempSelectedSongs = songs.slice(0, currentSelectSize);
+    GM.toast("已随机抽取 " + currentSelectSize + " 项");
+    renderSelectList();
+  });
+
+  selectBtnSubmit.addEventListener("click", function() {
+    if (tempSelectedSongs.length < currentSelectSize) return;
+
+    if (GM.state.size !== currentSelectSize) {
+      GM.state.size = currentSelectSize;
+      GM.state.winners = GM.makeWinners(currentSelectSize);
+      GM.buildTable();
+      document.getElementById("sizeSelect").value = currentSelectSize;
+      document.getElementById("qsSizeSelect").value = currentSelectSize;
+    }
+
+    var arr = new Array(currentSelectSize).fill("");
+    for (var i = 0; i < tempSelectedSongs.length; i++) arr[i] = tempSelectedSongs[i];
+    
+    GM.state.inputs = arr;
+    GM.clearAllWinners(); 
+    
+    var inputs = GM.tbody.querySelectorAll("input[data-idx]");
+    for (var q = 0; q < inputs.length; q++) {
+      if (inputs[q]) inputs[q].value = GM.state.inputs[q];
+    }
+    
+    GM.save();
+    GM.render();
+    selectMask.classList.remove("show");
+    GM.toast("自选歌曲已应用成功");
+  });
+
+  document.getElementById("selectClose").addEventListener("click", function() { selectMask.classList.remove("show"); });
+  selectMask.addEventListener("click", function(e) { if (e.target === selectMask) selectMask.classList.remove("show"); });
+  document.getElementById("qsBtnCustomSelect").addEventListener("click", openSelectModal);
+
+
+  /* ===== 视图切换与全局初始化 ===== */
   document.getElementById("btnViewToggle").addEventListener("click", function () {
     GM.switchTab(!GM.isQuickView);
   });
 
-  /* ===== 随机分组 ===== */
   function executeShuffle() {
     var filled = [];
     for (var i = 0; i < GM.seeds(); i++) {
@@ -606,7 +771,6 @@ var GM = window.GM = window.GM || {};
     GM.save(); GM.render();
     GM.toast("已随机分组");
   }
-
   document.getElementById("qsBtnShuffle").addEventListener("click", executeShuffle);
   document.getElementById("btnShuffleOrig").addEventListener("click", executeShuffle);
 
@@ -616,36 +780,23 @@ var GM = window.GM = window.GM || {};
       GM.save(); GM.render();
     }, true);
   });
-
   document.getElementById("btnClearAll").addEventListener("click", function () {
-    showConfirm("将清空全部选项与对阵结果，确定吗？", function () {
-      GM.state.inputs = new Array(GM.seeds()).fill("");
-      GM.state.title = "金曲世界杯";
-      GM.state.covers = [];
-      GM.state.avgColor = null;
-      document.getElementById("titleInput").value = GM.state.title;
-      GM.clearAllWinners();
-      var inputs = GM.tbody.querySelectorAll("input[data-idx]");
-      for (var k = 0; k < inputs.length; k++) inputs[k].value = "";
-      GM.save(); GM.render();
-    }, true);
+    showConfirm("将清空全部选项与对阵结果，确定吗？", function () { executeReset(); }, true);
   });
 
-  /* ===== 导出按钮事件 ===== */
   document.getElementById("btnDownloadImg").addEventListener("click", GM.downloadImage);
   document.getElementById("btnCopyImg").addEventListener("click", GM.copyImage);
 
-  /* ===== 规模切换 ===== */
   function syncSizeSeg() {
     document.getElementById("sizeSelect").value = GM.state.size;
     document.getElementById("qsSizeSelect").value = GM.state.size;
   }
-
   function setSize(n) {
     GM.state.size = n;
     GM.state.inputs = new Array(n).fill("");
     GM.state.winners = GM.makeWinners(n);
     GM.state.covers = [];
+    GM.state.allFetchedSongs = []; 
     GM.state.avgColor = null;
     GM.state.title = "金曲世界杯";
     document.getElementById("titleInput").value = GM.state.title;
@@ -654,20 +805,13 @@ var GM = window.GM = window.GM || {};
     GM.render();
     GM.save();
   }
-
   function handleSizeChange(n) {
     if (n === GM.state.size) return;
     setSize(n);
     GM.toast("已切换为 " + n + " 强，并清空所有数据");
   }
-
-  document.getElementById("sizeSelect").addEventListener("change", function (e) {
-    handleSizeChange(+e.target.value);
-  });
-
-  document.getElementById("qsSizeSelect").addEventListener("change", function (e) {
-    handleSizeChange(+e.target.value);
-  });
+  document.getElementById("sizeSelect").addEventListener("change", function (e) { handleSizeChange(+e.target.value); });
+  document.getElementById("qsSizeSelect").addEventListener("change", function (e) { handleSizeChange(+e.target.value); });
 
   /* ===== 启动 ===== */
   try {
@@ -680,9 +824,6 @@ var GM = window.GM = window.GM || {};
 
   GM.buildTable();
   syncSizeSeg();
-
-  // V1.9.8: 无论是否有数据，刷新页面时都让他默认进入【快速开始页面】
   GM.switchTab(true);
-
   GM.render();
 })();

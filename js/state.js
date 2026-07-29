@@ -1,23 +1,14 @@
 /* ===== state.js — 全局状态管理与本地存储 ===== */
 var GM = window.GM = window.GM || {};
 
-GM.LS_KEY = "bracket_state_v4";
-GM.LS_KEY_LEGACY = ["bracket_state_v3", "bracket64_state_v2", "bracket64_state_v1"];
+GM.LS_KEY = "bracket_state_v5"; // 升级缓存版本
+GM.LS_KEY_LEGACY = ["bracket_state_v4", "bracket_state_v3", "bracket64_state_v2", "bracket64_state_v1"];
 
 GM.SIZE_CONFIG = {
   64: { seeds: 64, roundNames: ["32强", "16强", "8强", "1/4决赛", "半决赛", "决赛"] },
   32: { seeds: 32, roundNames: ["16强", "8强", "1/4决赛", "半决赛", "决赛"] },
   16: { seeds: 16, roundNames: ["8强", "1/4决赛", "半决赛", "决赛"] }
 };
-
-GM.DEMO = ["180度","E-Lover","Honey Honey","Stefanie","The Moment","爱情证书","爱情字典","安宁",
-  "半句再见","比较幸福","不是真的爱我","彩虹金刚","当冬夜渐暖","第一天","风筝","风衣",
-  "咕叽咕叽","害怕","和平","很好","坏天气","开始懂了","克卜勒","了解",
-  "另一张脸","绿光","没有人的方向","明天晴天","逆光","浓眉毛","飘着","平日快乐",
-  "任性","日落","尚好的青春","神奇","逃亡","天黑黑","天使的指纹","同类",
-  "完美的一天","我不爱","我不难过","我的爱","我怀念的","我要的幸福","我也很想他","相信",
-  "需要你","漩涡","眼泪成诗","样子","一样的夏天","银泰","隐形人","永远",
-  "愚人的国度","雨还是不停地落下","雨天","遇见","直来直往","祝你开心","超快感","奔"];
 
 GM.makeWinners = function (seeds) {
   var arr = [];
@@ -32,7 +23,8 @@ GM.state = {
   winners: GM.makeWinners(64),
   meta: {},
   covers: [],
-  avgColor: null
+  avgColor: null,
+  allFetchedSongs: [] // V2.3 新增：用于缓存获取到的 200 首完整歌单
 };
 
 /* ===== 状态查询函数 ===== */
@@ -62,7 +54,7 @@ GM.save = function () {
 GM.load = function () {
   try {
     var raw = localStorage.getItem(GM.LS_KEY);
-    if (!raw) raw = localStorage.getItem("bracket_state_v3");
+    if (!raw) raw = localStorage.getItem("bracket_state_v4");
     if (!raw) return;
 
     var s = JSON.parse(raw);
@@ -74,6 +66,8 @@ GM.load = function () {
       GM.state.meta = s.meta || {};
       GM.state.covers = s.covers || [];
       GM.state.avgColor = s.avgColor || null;
+      GM.state.allFetchedSongs = s.allFetchedSongs || []; // 恢复缓存的 200 首
+      
       var expect = GM.makeWinners(s.size);
       GM.state.winners = expect.map(function (arr, r) {
         if (Array.isArray(s.winners[r])) {

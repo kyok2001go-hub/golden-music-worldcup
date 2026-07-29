@@ -2,17 +2,15 @@
 var GM = window.GM = window.GM || {};
 
 GM.CORS_PROXY = "https://api.allorigins.win/raw?url=";
-GM.BASE_URL = "https://itunes.apple.com"; // 修复1：抛弃 .com.cn，统一使用全球主域名规避强拦截
+GM.BASE_URL = "https://itunes.apple.com"; 
 
-GM._jsonpMode = false; // 全局标记：一旦 fetch 被拦截（如 iOS），后续全走 JSONP
+GM._jsonpMode = false;
 GM._jsonpSeq = 0;
 
-/* ===== 高度封装的统一请求 (Fetch 优先，失败秒切 JSONP) ===== */
 GM.get = async function(url) {
   if (!GM._jsonpMode && window.fetch) {
     try {
       var ctrl = new AbortController();
-      // 修复3：9秒超时物理斩断，防止 iOS 遇到拦截时挂起请求导致假死
       var timer = setTimeout(function() { ctrl.abort(); }, 9000); 
       try {
         var response = await fetch(url, { signal: ctrl.signal });
@@ -22,13 +20,11 @@ GM.get = async function(url) {
         clearTimeout(timer);
       }
     } catch (error) {
-      // 修复4：只要 fetch 失败（被 iOS 拦截抛出 CORS 或中止），立即全局切为 JSONP
       console.warn("Fetch 失败 (可能被 iOS 拦截)，切换到 JSONP 模式:", error);
       GM._jsonpMode = true; 
     }
   }
   
-  // JSONP 兜底（直接生成 script 标签，完美规避 iOS Universal Links 拦截）
   return new Promise(function(resolve, reject) {
     var cbName = "__itunesCb" + (++GM._jsonpSeq);
     var script = document.createElement("script");
@@ -63,7 +59,6 @@ GM.get = async function(url) {
   });
 };
 
-/* ===== 旧的通用 Fetch 请求 (保留给 CORS 代理兜底用) ===== */
 GM.fetchJson = function (url, cb) {
   if (!window.fetch) { cb(new Error("no fetch")); return; }
   var timer = setTimeout(function () { cb(new Error("请求超时")); }, 12000);
@@ -81,7 +76,6 @@ GM.fetchJson = function (url, cb) {
 
 /* ===== 歌曲数据处理 ===== */
 GM.handleSongs = function (name, data) {
-  var limit = GM.seeds();
   var results = (data && data.results) || [];
   var kw = name.toLowerCase();
   var seen = {};
@@ -110,15 +104,13 @@ GM.handleSongs = function (name, data) {
       artworkUrl100: it.artworkUrl100 || "",
       source: 'api'
     };
-
-    if (songs.length >= limit) break;
+    // V2.3: 去掉截断逻辑，最大化收集200首歌曲，以便后续「自选」
   }
   return { songs: songs, metaData: metaData };
 };
 
 /* ===== 核心获取歌手歌曲 ===== */
 GM.coreFetchArtist = function (name, onSuccess, onFail) {
-  // 修复2：关键移除容易触发 Apple Music 唤醒的 &media=music 参数，仅保留 entity=song
   var query = "/search?term=" + encodeURIComponent(name) + "&entity=song&attribute=artistTerm&limit=200&country=CN";
   var targetUrl = GM.BASE_URL + query;
   
@@ -135,7 +127,6 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
     onFail("获取失败：无法连接歌曲服务，请换个网络环境再试，或到电脑端使用该功能");
   }
 
-  // 使用封装好的 GM.get，它会自动处理 iOS 拦截并实现 Fetch 到 JSONP 的无缝降级
   GM.get(targetUrl)
     .then(function(data) {
       onData(data);
@@ -169,7 +160,6 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
   }
 };
 
-/* ===== 提取封面通用逻辑 ===== */
 GM.extractCoversFromApiRes = function (res) {
   var newCovers = [];
   for (var i = 0; i < res.songs.length; i++) {
