@@ -429,7 +429,7 @@ var GM = window.GM = window.GM || {};
       var inputs = GM.tbody.querySelectorAll("input[data-idx]");
       for (var q = 0; q < inputs.length; q++) inputs[q].value = GM.state.inputs[q];
       GM.save(); GM.render();
-      GM.toast("已为您生成对决列表，可点击上方「自选歌曲」换歌", 2500);
+      GM.toast("已生成对决列表，点击上方「自选歌曲」换歌", 2500);
     }, function (errMsg) {
       resetLoading();
       document.getElementById("artistInput").value = name;
@@ -523,7 +523,7 @@ var GM = window.GM = window.GM || {};
         for (var q = 0; q < inputs.length; q++) inputs[q].value = GM.state.inputs[q];
         GM.save(); GM.render();
         closeArtistModal();
-        GM.toast("已为您生成对决列表，可点击上方「自选歌曲」换歌");
+        GM.toast("已生成对决列表，点击上方「自选歌曲」换歌");
       }, 350);
     }, function (err) {
       btnFetchArtist.disabled = false;
