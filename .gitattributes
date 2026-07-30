@@ -1,2 +1,12 @@
-# 强制所有文件使用 LF 换行符
+# 强制所有文本文件使用 LF 换行符
 * text eol=lf
+
+# 二进制文件禁止换行符转换（防止图片等资源被 text 转换损坏）
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary

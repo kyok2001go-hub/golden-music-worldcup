@@ -192,9 +192,22 @@ td.node.champion .champ-name { display: block; margin-top: 2px; }
   #titleInput { font-size: 26px !important; padding-bottom: 4px; }
   .toolbar { gap: 6px; padding: 8px; }
   .toolbar .hint { order: 0; margin-right: 0; margin-bottom: 8px; margin-top: 4px; }
+  
+  /* 修复：强制统一字号，利用 !important 覆盖下方针对 select 的 16px 全局字号 */
+  .toolbar .btn { 
+    flex: 1 1 calc(50% - 3px); 
+    height: 36px;
+    font-size: 14px !important; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
   #btnMore { display: block; }
   .toolbar .more-item { display: none; }
   .toolbar.expanded .more-item { display: block; }
+  
+  /* Select 强制16px 是为了防止 iOS Safari 输入框获取焦点时自动放大屏幕 */
   input, textarea, select { font-size: 16px !important; }
   .seed-wrap input { font-size: 16px; }
   #batchArea { font-size: 16px; }
