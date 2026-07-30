@@ -34,16 +34,41 @@
 /* ===== 搜索框组件 ===== */
 .qs-search-box {
   display: flex; align-items: center; width: 100%; max-width: 480px;
-  background: rgba(12, 16, 36, 0.6); border: 1px solid rgba(255,255,255,.2);
-  border-radius: 12px; transition: border-color 0.2s;
+  /* 本体变全透明，仅作结构容器 */
+  background: transparent; 
+  border: 1px solid transparent; 
+  border-radius: 12px; 
   position: relative;
+  /* 重新建立独立图层，把光晕锁在自己体内，不再漏到网页底下去 */
+  z-index: 1; 
 }
-/* 搜索框下层：流动极光光晕（渐变背景 + 强模糊 + 流动/呼吸动画） */
+
+/* 搜索框背景与边框（z-index: -1，盖在光晕上面，产生透光效果） */
+.qs-search-box::after {
+  content: "";
+  position: absolute;
+  inset: -1px; /* 撑满包含透明边框的区域 */
+  z-index: -1;
+  border-radius: inherit;
+  background: rgba(12, 16, 36, 0.6); /* 恢复半透明玻璃背景，可微微透出底层光晕 */
+  border: 1px solid rgba(255,255,255,.2);
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  pointer-events: none;
+}
+
+/* 搜索框聚焦时的发光效果转移给 ::after */
+.qs-search-box:focus-within::after {
+  border-color: #5b6fc4; 
+  box-shadow: 0 0 0 2px rgba(91, 111, 196, .25); 
+}
+
+/* 流动极光光晕（z-index: -2，垫在最底层） */
 .qs-search-box::before {
   content: "";
   position: absolute;
-  inset: -3px -8px -16px; /* 下部延伸更多，光晕从下方透出 */
-  z-index: -1;
+  inset: -3px -8px -16px; /* 下部延伸更多，光晕从下方溢出 */
+  z-index: -2; 
   border-radius: 20px;
   background: linear-gradient(90deg, #5b6fc4, #c498ff, #F0AC4A, #5b6fc4);
   background-size: 200% 200%;
@@ -63,7 +88,7 @@
 @media (prefers-reduced-motion: reduce) {
   .qs-search-box::before { animation: none; opacity: 0.45; }
 }
-.qs-search-box:focus-within { border-color: #5b6fc4; box-shadow: 0 0 0 2px rgba(91, 111, 196, .25); }
+
 .qs-search-input {
   flex: 1; min-width: 0; background: transparent; border: none; color: #fff;
   padding: 16px; font-size: 16px; outline: none;
@@ -92,25 +117,32 @@
 /* ===== 快速开始操作底栏 ===== */
 .qs-r-actions {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-  width: 85%; max-width: 360px;
-  display: flex; gap: 10px; justify-content: center;
+  width: calc(100% - 40px); max-width: 480px; 
+  display: flex; gap: 10px; justify-content: center; align-items: center; 
   background: var(--theme-action-bg, rgba(19, 14, 24, 0.85));
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   padding: 10px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,.15);
   box-shadow: 0 8px 32px rgba(0,0,0,0.5); z-index: 1000;
 }
-.qs-btn-act { flex: 1; max-width: 180px; padding: 10px 0; font-size: 14.5px; font-weight: 700; border: none; border-radius: 999px; cursor: pointer; transition: transform 0.1s, background 0.15s; }
+.qs-btn-act { 
+  flex: 1; max-width: none; padding: 10px 0; font-size: 14.5px; 
+  font-weight: 700; border: none; border-radius: 999px; cursor: pointer; 
+  transition: transform 0.1s, background 0.15s; 
+}
 .qs-btn-act:active { transform: scale(0.96); }
 .qs-btn-act.secondary { background: var(--theme-btn-secondary, rgba(255,255,255,.1)); color: #fff; }
 .qs-btn-act.primary { background: var(--theme-btn-primary, #5b6fc4); color: #fff; box-shadow: 0 4px 12px var(--theme-primary-shadow, rgba(91,111,196,.4)); }
 
-/* 仅图标操作按钮（关闭） */
+/* 仅图标操作按钮（分享、关闭等），固定为略小的正圆 */
 .qs-btn-act.icon-only {
-  flex: 0 0 44px; max-width: 44px;
+  flex: 0 0 38px; max-width: 38px; height: 38px; padding: 0;
   background: var(--theme-btn-secondary, rgba(255,255,255,0.1));
   color: rgba(255,255,255,0.6); border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   font-size: 16px; font-weight: bold;
+}
+.qs-btn-act.icon-only svg {
+  width: 18px; height: 18px; fill: currentColor;
 }
 
 .qs-r-reselect { background: rgba(255,255,255,.08); border: none; color: #dfe3f5; padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; transition: background 0.15s; }
