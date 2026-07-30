@@ -135,7 +135,8 @@
 
 /* 仅图标操作按钮（分享、关闭等），固定为略小的正圆 */
 .qs-btn-act.icon-only {
-  flex: 0 0 38px; max-width: 38px; height: 38px; padding: 0;
+  flex: 0 0 38px; width: 38px; min-width: 38px; height: 38px; min-height: 38px; padding: 0;
+  flex-shrink: 0; /* 强制不允许缩小，防止挤压 */
   background: var(--theme-btn-secondary, rgba(255,255,255,0.1));
   color: rgba(255,255,255,0.6); border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
@@ -528,6 +529,6 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
   .sel-year { font-size: 10px; }
   .sel-check { width: 14px; height: 14px; font-size: 9px; }
   
-  .qs-btn-act.icon-only { flex: 0 0 40px; height: 40px; } 
+  .qs-btn-act.icon-only { flex: 0 0 40px; width: 40px; min-width: 40px; height: 40px; min-height: 40px; } 
   .select-btn-rand, .select-btn-submit { min-width: 120px; }
 }
