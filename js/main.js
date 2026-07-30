@@ -318,6 +318,16 @@ var GM = window.GM = window.GM || {};
   var batchArea = document.getElementById("batchArea");
   var batchCount = document.getElementById("batchCount");
 
+  // V2.3.6: 修复默认的示例歌曲数据
+  var DEMO_SONGS = ["180度","E-Lover","Honey Honey","Stefanie","The Moment","爱情证书","爱情字典","安宁",
+    "半句再见","比较幸福","不是真的爱我","彩虹金刚","当冬夜渐暖","第一天","风筝","风衣",
+    "咕叽咕叽","害怕","和平","很好","坏天气","开始懂了","克卜勒","了解",
+    "另一张脸","绿光","没有人的方向","明天晴天","逆光","浓眉毛","飘着","平日快乐",
+    "任性","日落","尚好的青春","神奇","逃亡","天黑黑","天使的指纹","同类",
+    "完美的一天","我不爱","我不难过","我的爱","我怀念的","我要的幸福","我也很想他","相信",
+    "需要你","漩涡","眼泪成诗","样子","一样的夏天","银泰","隐形人","永远",
+    "愚人的国度","雨还是不停地落下","雨天","遇见","直来直往","祝你开心","超快感","奔"];
+
   function parseBatchText(text) {
     var lines = String(text).split(/\r\n|\r|\n/);
     var items = [];
@@ -380,7 +390,9 @@ var GM = window.GM = window.GM || {};
   batchArea.addEventListener("input", updateBatchCount);
   batchMask.addEventListener("click", function (e) { if (e.target === batchMask) closeBatchModal(); });
   document.getElementById("btnBatchDemo").addEventListener("click", function () {
-    batchArea.value = GM.DEMO.join("\n");
+    // V2.3.6: 使用真实的 Demo 数据进行填充
+    var size = GM.seeds();
+    batchArea.value = DEMO_SONGS.slice(0, size).join("\n");
     updateBatchCount();
     batchArea.focus();
   });
@@ -464,6 +476,57 @@ var GM = window.GM = window.GM || {};
   }
   document.getElementById("qsBtnReset1").addEventListener("click", executeReset);
   document.getElementById("qsBtnReset2").addEventListener("click", executeReset);
+
+  // ===== V2.3.6: 分享功能逻辑 =====
+  function handleShare() {
+    var topCovers = (GM.state.covers || []).slice(0, 3);
+    
+    // 【修复对战弹窗封面丢失Bug】：提取现有非手写的封面信息，构造极简对象跟随分享
+    var shareMeta = {};
+    var currentInputs = GM.state.inputs || [];
+    for (var j = 0; j < currentInputs.length; j++) {
+      var song = currentInputs[j];
+      if (song && GM.state.meta[song] && GM.state.meta[song].source !== 'manual' && GM.state.meta[song].artworkUrl100) {
+        shareMeta[song] = GM.state.meta[song].artworkUrl100;
+      }
+    }
+    
+    var shareData = {
+      s: GM.state.size,
+      t: GM.state.title,
+      i: GM.state.inputs,
+      c: topCovers,
+      m: shareMeta // 将过滤后的封面库带上
+    };
+    
+    var jsonStr = JSON.stringify(shareData);
+    if (typeof LZString === "undefined") {
+      GM.toast("压缩组件尚未加载完毕，请稍后再试");
+      return;
+    }
+    var compressedStr = LZString.compressToEncodedURIComponent(jsonStr);
+    var shareUrl = window.location.origin + window.location.pathname + "?share=" + compressedStr;
+    
+    // 【优化分享文案】
+    var currentTitle = GM.state.title || "金曲世界杯";
+    var shareText = "我在玩【" + currentTitle + "】的歌曲世界杯，这一局你会怎么选？快来跟我一起试试~ " + shareUrl;
+    
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(shareText).then(function() {
+        GM.toast("已复制本局对阵，快发给朋友来玩吧~", 2000);
+      }).catch(function() {
+        prompt("请手动复制以下分享文案：", shareText);
+      });
+    } else {
+      prompt("请手动复制以下分享文案：", shareText);
+    }
+  }
+
+  var qsBtnShare1 = document.getElementById("qsBtnShare1");
+  if (qsBtnShare1) qsBtnShare1.addEventListener("click", handleShare);
+  var qsBtnShare2 = document.getElementById("qsBtnShare2");
+  if (qsBtnShare2) qsBtnShare2.addEventListener("click", handleShare);
+  // ================================
 
   document.getElementById("qsBtnStartMatch").addEventListener("click", function () {
     var nxt = findFirstUnplayedMatch();
@@ -631,7 +694,6 @@ var GM = window.GM = window.GM || {};
       var isSelected = tempSelectedSongs.indexOf(item.name) !== -1;
       var cls = "select-card" + (isSelected ? " selected" : "");
       
-      // 2.3.2 优化：使用 sel-card-bottom 容器强制保证 年代字段 和 勾选项在底部两端对齐
       html += '<div class="' + cls + '" data-song="' + GM.esc(item.name) + '">';
       html += '<div class="sel-name" title="' + GM.esc(item.name) + '">' + GM.esc(item.name) + '</div>';
       html += '<div class="sel-card-bottom">';
@@ -716,8 +778,7 @@ var GM = window.GM = window.GM || {};
       GM.state.size = currentSelectSize;
       GM.state.winners = GM.makeWinners(currentSelectSize);
       GM.buildTable();
-      document.getElementById("sizeSelect").value = currentSelectSize;
-      document.getElementById("qsSizeSelect").value = currentSelectSize;
+      syncSizeSeg();
     }
 
     var arr = new Array(currentSelectSize).fill("");
@@ -821,6 +882,51 @@ var GM = window.GM = window.GM || {};
   } catch (e) {}
   GM.load();
   if (!GM.SIZE_CONFIG[GM.state.size]) GM.state.size = 64;
+
+  // ===== V2.3.6: 分享链接解析逻辑 (带对战封面恢复) =====
+  var params = new URLSearchParams(window.location.search);
+  var shareParam = params.get("share");
+  if (shareParam && typeof LZString !== "undefined") {
+    try {
+      var decompressedStr = LZString.decompressFromEncodedURIComponent(shareParam);
+      var parsedData = JSON.parse(decompressedStr);
+      if (parsedData && parsedData.i && Array.isArray(parsedData.i)) {
+         GM.state.size = parsedData.s || 64;
+         GM.state.title = parsedData.t || "好友分享的金曲世界杯";
+         GM.state.inputs = parsedData.i;
+         
+         // 还原封面，并清空主题色缓存，让 theme.js 重新提取
+         GM.state.covers = parsedData.c || [];
+         GM.state.avgColor = null; 
+         
+         // 标志着当前是分享进来的干净状态，清空自选缓存库
+         GM.state.allFetchedSongs = []; 
+         GM.state.winners = GM.makeWinners(GM.state.size);
+         
+         // 【对阵弹窗封面修复】：将提取的封面信息还原到本地的元数据缓存中
+         GM.state.meta = {};
+         if (parsedData.m) {
+           for (var songKey in parsedData.m) {
+             GM.state.meta[songKey] = {
+               artworkUrl100: parsedData.m[songKey],
+               source: 'api' // 标记为 api 以便让对阵弹窗能够正常渲染这张图片
+             };
+           }
+         }
+         
+         document.getElementById("titleInput").value = GM.state.title;
+         syncSizeSeg(); // 同步 UI 上的规模选项
+         
+         // 擦除 URL 上的分享参数
+         window.history.replaceState({}, document.title, window.location.pathname);
+         setTimeout(function() { GM.toast("已加载好友分享的对阵列表！", 2500); }, 200);
+      }
+    } catch (e) {
+      console.error("解析分享链接失败:", e);
+      setTimeout(function() { GM.toast("分享链接已失效或格式错误"); }, 200);
+    }
+  }
+  // ===================================
 
   GM.buildTable();
   syncSizeSeg();

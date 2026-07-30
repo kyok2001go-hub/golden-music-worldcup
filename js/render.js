@@ -152,6 +152,16 @@ GM.renderQuickStart = function (done, TM) {
     if (GM.isQuickView) {
       document.getElementById("qsActionsWrap").style.display = "block";
     }
+    
+    // ===== V2.3.6: 判断是否要隐藏“自选歌曲”按钮 =====
+    var qsBtnCustomSelect = document.getElementById("qsBtnCustomSelect");
+    if (qsBtnCustomSelect) {
+      if (!GM.state.allFetchedSongs || GM.state.allFetchedSongs.length === 0) {
+        qsBtnCustomSelect.style.display = "none";
+      } else {
+        qsBtnCustomSelect.style.display = "";
+      }
+    }
 
     document.getElementById("qsProgressText").textContent = "共 " + GM.seeds() + " 位选手，已决出 " + done + " / " + TM + " 场";
     document.getElementById("qsProgressFill2").style.width = (done / TM * 100).toFixed(1) + "%";
