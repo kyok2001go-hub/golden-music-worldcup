@@ -35,7 +35,33 @@
 .qs-search-box {
   display: flex; align-items: center; width: 100%; max-width: 480px;
   background: rgba(12, 16, 36, 0.6); border: 1px solid rgba(255,255,255,.2);
-  border-radius: 12px; overflow: hidden; transition: border-color 0.2s;
+  border-radius: 12px; transition: border-color 0.2s;
+  position: relative;
+}
+/* 搜索框下层：流动极光光晕（渐变背景 + 强模糊 + 流动/呼吸动画） */
+.qs-search-box::before {
+  content: "";
+  position: absolute;
+  inset: -3px -8px -16px; /* 下部延伸更多，光晕从下方透出 */
+  z-index: -1;
+  border-radius: 20px;
+  background: linear-gradient(90deg, #5b6fc4, #c498ff, #F0AC4A, #5b6fc4);
+  background-size: 200% 200%;
+  filter: blur(18px);
+  opacity: 0.55;
+  pointer-events: none;
+  animation: aurora-flow 8s linear infinite, aurora-breathe 4s ease-in-out infinite;
+}
+@keyframes aurora-flow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+@keyframes aurora-breathe {
+  0%, 100% { opacity: 0.38; }
+  50% { opacity: 0.65; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qs-search-box::before { animation: none; opacity: 0.45; }
 }
 .qs-search-box:focus-within { border-color: #5b6fc4; box-shadow: 0 0 0 2px rgba(91, 111, 196, .25); }
 .qs-search-input {
