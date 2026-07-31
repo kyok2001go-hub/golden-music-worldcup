@@ -4,12 +4,24 @@
 .header-section {
   position: relative;
   width: 100%;
+  /* * [核心修复] 移除背景、圆角、毛玻璃与裁剪 
+   * 打破“层叠上下文”的禁锢，让内部的下拉菜单与全局比对 z-index，彻底突破遮挡
+   */
+}
+
+/* 使用 ::before 伪元素接管原本容器的背景与毛玻璃效果 */
+.header-section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
   background: #130E18;
   border-radius: 8px 8px 0 0;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  overflow: hidden;
+  pointer-events: none; /* 确保不阻挡点击交互 */
+  z-index: -1;
 }
+
 .header-section::after {
   content: "";
   position: absolute;
@@ -24,6 +36,8 @@
   position: absolute; inset: 0;
   display: flex;
   z-index: 0;
+  border-radius: 8px 8px 0 0; /* 将外层的裁剪下放至图片容器，保证圆角不出界 */
+  overflow: hidden;
 }
 .header-covers img {
   width: 33.33333%; height: 100%;
@@ -33,6 +47,7 @@
 .header-gradient {
   position: absolute; inset: 0; z-index: 1;
   background: linear-gradient(to bottom, var(--theme-grad-start, rgba(19, 14, 24, 0.3)) 0%, var(--theme-grad-end, rgba(19, 14, 24, 1)) 100%);
+  border-radius: 8px 8px 0 0; /* 同步加上圆角 */
 }
 .header-ratio {
   padding-top: 33.33333%;
