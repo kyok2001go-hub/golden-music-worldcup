@@ -318,7 +318,6 @@ var GM = window.GM = window.GM || {};
   var batchArea = document.getElementById("batchArea");
   var batchCount = document.getElementById("batchCount");
 
-  // V2.3.6: 修复默认的示例歌曲数据
   var DEMO_SONGS = ["180度","E-Lover","Honey Honey","Stefanie","The Moment","爱情证书","爱情字典","安宁",
     "半句再见","比较幸福","不是真的爱我","彩虹金刚","当冬夜渐暖","第一天","风筝","风衣",
     "咕叽咕叽","害怕","和平","很好","坏天气","开始懂了","克卜勒","了解",
@@ -367,7 +366,7 @@ var GM = window.GM = window.GM || {};
     GM.state.inputs = arr;
     GM.state.covers = [];
     GM.state.avgColor = null;
-    GM.state.allFetchedSongs = []; // 手动批量录入时清空缓存歌曲
+    GM.state.allFetchedSongs = [];
     GM.clearAllWinners();
     var inputs = GM.tbody.querySelectorAll("input[data-idx]");
     for (var k = 0; k < inputs.length; k++) inputs[k].value = GM.state.inputs[k];
@@ -390,7 +389,6 @@ var GM = window.GM = window.GM || {};
   batchArea.addEventListener("input", updateBatchCount);
   batchMask.addEventListener("click", function (e) { if (e.target === batchMask) closeBatchModal(); });
   document.getElementById("btnBatchDemo").addEventListener("click", function () {
-    // V2.3.6: 使用真实的 Demo 数据进行填充
     var size = GM.seeds();
     batchArea.value = DEMO_SONGS.slice(0, size).join("\n");
     updateBatchCount();
@@ -477,11 +475,9 @@ var GM = window.GM = window.GM || {};
   document.getElementById("qsBtnReset1").addEventListener("click", executeReset);
   document.getElementById("qsBtnReset2").addEventListener("click", executeReset);
 
-  // ===== V2.3.6: 分享功能逻辑 =====
+  // ===== 分享功能逻辑 (改用 KV + Functions 架构) =====
   function handleShare() {
     var topCovers = (GM.state.covers || []).slice(0, 3);
-    
-    // 【修复对战弹窗封面丢失Bug】：提取现有非手写的封面信息，构造极简对象跟随分享
     var shareMeta = {};
     var currentInputs = GM.state.inputs || [];
     for (var j = 0; j < currentInputs.length; j++) {
@@ -491,35 +487,55 @@ var GM = window.GM = window.GM || {};
       }
     }
     
+    // 构造我们要存入数据库的短数据
     var shareData = {
       s: GM.state.size,
       t: GM.state.title,
       i: GM.state.inputs,
       c: topCovers,
-      m: shareMeta // 将过滤后的封面库带上
+      m: shareMeta
     };
     
-    var jsonStr = JSON.stringify(shareData);
-    if (typeof LZString === "undefined") {
-      GM.toast("压缩组件尚未加载完毕，请稍后再试");
-      return;
-    }
-    var compressedStr = LZString.compressToEncodedURIComponent(jsonStr);
-    var shareUrl = window.location.origin + window.location.pathname + "?share=" + compressedStr;
-    
-    // 【优化分享文案】
-    var currentTitle = GM.state.title || "金曲世界杯";
-    var shareText = "我在玩【" + currentTitle + "】的歌曲世界杯，这一局你会怎么选？快来跟我一起试试~ " + shareUrl;
-    
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(shareText).then(function() {
-        GM.toast("已复制本局对阵，快发给朋友来玩吧~", 2000);
-      }).catch(function() {
+    // 提示用户正在生成
+    GM.toast("正在生成专属对战链接，请稍候...", 10000);
+
+    // 提交数据给 Cloudflare Functions API
+    fetch('/api/share', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(shareData)
+    })
+    .then(function(res) {
+      if (!res.ok) throw new Error("HTTP error " + res.status);
+      return res.json();
+    })
+    .then(function(data) {
+      if (data.error) throw new Error(data.error);
+
+      // 从接口拿到生成的短码 id
+      var shareUrl = window.location.origin + window.location.pathname + "?id=" + data.id;
+      var currentTitle = GM.state.title || "金曲世界杯";
+      var shareText = "我在玩【" + currentTitle + "】的歌曲世界杯，这一局你会怎么选？快来跟我一起试试~ " + shareUrl;
+      
+      // 写入剪贴板或弹窗提醒
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(shareText).then(function() {
+          GM.toast("已复制本局短链接，快发给朋友来玩吧~", 2000);
+        }).catch(function() {
+          prompt("请手动复制以下分享文案：", shareText);
+          GM.hideToast();
+        });
+      } else {
         prompt("请手动复制以下分享文案：", shareText);
-      });
-    } else {
-      prompt("请手动复制以下分享文案：", shareText);
-    }
+        GM.hideToast();
+      }
+    })
+    .catch(function(err) {
+      GM.toast("生成分享链接失败，请稍后重试", 2500);
+      console.error("Share error:", err);
+    });
   }
 
   var qsBtnShare1 = document.getElementById("qsBtnShare1");
@@ -645,24 +661,15 @@ var GM = window.GM = window.GM || {};
     var rawSongs = GM.state.allFetchedSongs || [];
     var listToRender = [];
     
-    // 构建含排序因子的列表
     for (var i = 0; i < rawSongs.length; i++) {
       var s = rawSongs[i];
       if (kw && s.toLowerCase().indexOf(kw) === -1) continue;
-      
       var meta = GM.state.meta[s] || {};
       var year = meta.releaseDate ? meta.releaseDate.substring(0, 4) : "未知";
       var sortYear = year === "未知" ? 9999 : parseInt(year);
-      
-      listToRender.push({
-        name: s,
-        year: year,
-        sortYear: sortYear,
-        originalIndex: i
-      });
+      listToRender.push({ name: s, year: year, sortYear: sortYear, originalIndex: i });
     }
     
-    // 排序处理
     if (sortType === "asc") {
       listToRender.sort(function(a, b) {
         if (a.sortYear !== b.sortYear) return a.sortYear - b.sortYear;
@@ -671,7 +678,7 @@ var GM = window.GM = window.GM || {};
     } else if (sortType === "desc") {
       listToRender.sort(function(a, b) {
         if (a.sortYear !== b.sortYear) {
-          if (a.sortYear === 9999) return 1; // 未知年份始终垫底
+          if (a.sortYear === 9999) return 1; 
           if (b.sortYear === 9999) return -1;
           return b.sortYear - a.sortYear;
         }
@@ -681,16 +688,12 @@ var GM = window.GM = window.GM || {};
     
     var html = "";
     var currentYear = null;
-    
     for (var j = 0; j < listToRender.length; j++) {
       var item = listToRender[j];
-      
-      // 年代分组标题逻辑
       if (sortType !== "default" && item.year !== currentYear) {
          currentYear = item.year;
          html += '<div class="sel-year-header">' + currentYear + (currentYear !== "未知" ? " 年" : "年份") + '</div>';
       }
-      
       var isSelected = tempSelectedSongs.indexOf(item.name) !== -1;
       var cls = "select-card" + (isSelected ? " selected" : "");
       
@@ -719,7 +722,6 @@ var GM = window.GM = window.GM || {};
     if (!card) return;
     var s = card.getAttribute("data-song");
     var idx = tempSelectedSongs.indexOf(s);
-    
     if (idx !== -1) {
       tempSelectedSongs.splice(idx, 1);
     } else {
@@ -736,9 +738,7 @@ var GM = window.GM = window.GM || {};
     currentSelectSize = parseInt(e.target.value);
     tempSelectedSongs = [];
     var songs = GM.state.allFetchedSongs || [];
-    for (var i = 0; i < Math.min(songs.length, currentSelectSize); i++) {
-      tempSelectedSongs.push(songs[i]);
-    }
+    for (var i = 0; i < Math.min(songs.length, currentSelectSize); i++) tempSelectedSongs.push(songs[i]);
     GM.toast("选手数量已切换为 " + currentSelectSize + " 个");
     renderSelectList();
   });
@@ -773,27 +773,21 @@ var GM = window.GM = window.GM || {};
 
   selectBtnSubmit.addEventListener("click", function() {
     if (tempSelectedSongs.length < currentSelectSize) return;
-
     if (GM.state.size !== currentSelectSize) {
       GM.state.size = currentSelectSize;
       GM.state.winners = GM.makeWinners(currentSelectSize);
       GM.buildTable();
       syncSizeSeg();
     }
-
     var arr = new Array(currentSelectSize).fill("");
     for (var i = 0; i < tempSelectedSongs.length; i++) arr[i] = tempSelectedSongs[i];
-    
     GM.state.inputs = arr;
     GM.clearAllWinners(); 
-    
     var inputs = GM.tbody.querySelectorAll("input[data-idx]");
     for (var q = 0; q < inputs.length; q++) {
       if (inputs[q]) inputs[q].value = GM.state.inputs[q];
     }
-    
-    GM.save();
-    GM.render();
+    GM.save(); GM.render();
     selectMask.classList.remove("show");
     GM.toast("自选歌曲已应用成功");
   });
@@ -801,7 +795,6 @@ var GM = window.GM = window.GM || {};
   document.getElementById("selectClose").addEventListener("click", function() { selectMask.classList.remove("show"); });
   selectMask.addEventListener("click", function(e) { if (e.target === selectMask) selectMask.classList.remove("show"); });
   document.getElementById("qsBtnCustomSelect").addEventListener("click", openSelectModal);
-
 
   /* ===== 视图切换与全局初始化 ===== */
   document.getElementById("btnViewToggle").addEventListener("click", function () {
@@ -874,62 +867,77 @@ var GM = window.GM = window.GM || {};
   document.getElementById("sizeSelect").addEventListener("change", function (e) { handleSizeChange(+e.target.value); });
   document.getElementById("qsSizeSelect").addEventListener("change", function (e) { handleSizeChange(+e.target.value); });
 
-  /* ===== 启动 ===== */
+  /* ===== 提取的通用渲染启动 ===== */
+  function initApp() {
+    GM.buildTable();
+    syncSizeSeg();
+    GM.switchTab(true);
+    GM.render();
+  }
+
+  /* ===== 启动与路由解析 ===== */
   try {
     for (var lk = 0; lk < GM.LS_KEY_LEGACY.length; lk++) {
       if (localStorage.getItem(GM.LS_KEY_LEGACY[lk]) !== null) localStorage.removeItem(GM.LS_KEY_LEGACY[lk]);
     }
   } catch (e) {}
+  
   GM.load();
   if (!GM.SIZE_CONFIG[GM.state.size]) GM.state.size = 64;
 
-  // ===== V2.3.6: 分享链接解析逻辑 (带对战封面恢复) =====
+  // KV Functions 代理分享链接解析逻辑
   var params = new URLSearchParams(window.location.search);
-  var shareParam = params.get("share");
-  if (shareParam && typeof LZString !== "undefined") {
-    try {
-      var decompressedStr = LZString.decompressFromEncodedURIComponent(shareParam);
-      var parsedData = JSON.parse(decompressedStr);
-      if (parsedData && parsedData.i && Array.isArray(parsedData.i)) {
-         GM.state.size = parsedData.s || 64;
-         GM.state.title = parsedData.t || "好友分享的金曲世界杯";
-         GM.state.inputs = parsedData.i;
-         
-         // 还原封面，并清空主题色缓存，让 theme.js 重新提取
-         GM.state.covers = parsedData.c || [];
-         GM.state.avgColor = null; 
-         
-         // 标志着当前是分享进来的干净状态，清空自选缓存库
-         GM.state.allFetchedSongs = []; 
-         GM.state.winners = GM.makeWinners(GM.state.size);
-         
-         // 【对阵弹窗封面修复】：将提取的封面信息还原到本地的元数据缓存中
-         GM.state.meta = {};
-         if (parsedData.m) {
-           for (var songKey in parsedData.m) {
-             GM.state.meta[songKey] = {
-               artworkUrl100: parsedData.m[songKey],
-               source: 'api' // 标记为 api 以便让对阵弹窗能够正常渲染这张图片
-             };
-           }
-         }
-         
-         document.getElementById("titleInput").value = GM.state.title;
-         syncSizeSeg(); // 同步 UI 上的规模选项
-         
-         // 擦除 URL 上的分享参数
-         window.history.replaceState({}, document.title, window.location.pathname);
-         setTimeout(function() { GM.toast("已加载好友分享的对阵列表！", 2500); }, 200);
-      }
-    } catch (e) {
-      console.error("解析分享链接失败:", e);
-      setTimeout(function() { GM.toast("分享链接已失效或格式错误"); }, 200);
-    }
-  }
-  // ===================================
+  var shareId = params.get("id"); // 从 URL 提取短码参数 id
 
-  GM.buildTable();
-  syncSizeSeg();
-  GM.switchTab(true);
-  GM.render();
+  if (shareId) {
+    GM.toast("正在加载好友分享的对阵列表...", 60000);
+    fetch('/api/share?id=' + shareId)
+      .then(function(res) {
+        if (!res.ok) throw new Error("网络请求失败");
+        return res.json();
+      })
+      .then(function(parsedData) {
+        if (parsedData && parsedData.i && Array.isArray(parsedData.i)) {
+           GM.state.size = parsedData.s || 64;
+           GM.state.title = parsedData.t || "好友分享的金曲世界杯";
+           GM.state.inputs = parsedData.i;
+           
+           // 还原封面，并清空自选缓存
+           GM.state.covers = parsedData.c || [];
+           GM.state.avgColor = null; 
+           GM.state.allFetchedSongs = []; 
+           GM.state.winners = GM.makeWinners(GM.state.size);
+           
+           // 还原对阵弹窗的局部封面
+           GM.state.meta = {};
+           if (parsedData.m) {
+             for (var songKey in parsedData.m) {
+               GM.state.meta[songKey] = {
+                 artworkUrl100: parsedData.m[songKey],
+                 source: 'api'
+               };
+             }
+           }
+           
+           document.getElementById("titleInput").value = GM.state.title;
+           
+           // 擦除 URL 上的短码，保持网页清爽
+           window.history.replaceState({}, document.title, window.location.pathname);
+           
+           initApp();
+           GM.toast("已加载好友分享的对阵列表！", 2500);
+        } else {
+           throw new Error("Invalid Format");
+        }
+      })
+      .catch(function(e) {
+        console.error("解析分享链接失败:", e);
+        GM.toast("分享链接已失效或短码错误", 2500);
+        initApp(); // 如果加载失败也需保证正常启动渲染
+      });
+  } else {
+    // 正常启动
+    initApp();
+  }
+
 })();
