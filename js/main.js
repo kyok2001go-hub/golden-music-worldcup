@@ -475,7 +475,63 @@ var GM = window.GM = window.GM || {};
   document.getElementById("qsBtnReset1").addEventListener("click", executeReset);
   document.getElementById("qsBtnReset2").addEventListener("click", executeReset);
 
-  // ===== 分享功能逻辑 (改用 KV + Functions 架构) =====
+  // ===== 分享弹窗及剪贴板逻辑 (KV + Functions 架构) =====
+  var currentShareText = "";
+  var shareModalMask = document.getElementById("shareModalMask");
+  var shareModalBtn = document.getElementById("shareModalBtn");
+  var shareModalClose = document.getElementById("shareModalClose");
+
+  function closeShareModal() {
+    if (shareModalMask) shareModalMask.classList.remove("show");
+  }
+  
+  if (shareModalClose) shareModalClose.addEventListener("click", closeShareModal);
+  if (shareModalMask) {
+    shareModalMask.addEventListener("click", function (e) {
+      if (e.target === shareModalMask) closeShareModal();
+    });
+  }
+
+  // 这里的点击是用户的“第一意图直接交互”，在 iOS 下可100%成功触发剪贴板写入
+  if (shareModalBtn) {
+    shareModalBtn.addEventListener("click", function () {
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(currentShareText).then(function () {
+          closeShareModal();
+          GM.toast("已复制本局短链接，快发给朋友来玩吧~", 2500);
+        }).catch(function () {
+          fallbackCopy(currentShareText);
+        });
+      } else {
+        fallbackCopy(currentShareText);
+      }
+    });
+  }
+
+  // 老旧浏览器或无剪贴板权限时的降级复制方案
+  function fallbackCopy(text) {
+    var textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      var successful = document.execCommand('copy');
+      closeShareModal();
+      if (successful) {
+        GM.toast("已复制本局短链接，快发给朋友来玩吧~", 2500);
+      } else {
+        prompt("请手动复制以下分享文案：", text);
+      }
+    } catch (err) {
+      closeShareModal();
+      prompt("请手动复制以下分享文案：", text);
+    }
+    document.body.removeChild(textArea);
+  }
+
   function handleShare() {
     var topCovers = (GM.state.covers || []).slice(0, 3);
     var shareMeta = {};
@@ -487,7 +543,6 @@ var GM = window.GM = window.GM || {};
       }
     }
     
-    // 构造我们要存入数据库的短数据
     var shareData = {
       s: GM.state.size,
       t: GM.state.title,
@@ -496,10 +551,8 @@ var GM = window.GM = window.GM || {};
       m: shareMeta
     };
     
-    // 提示用户正在生成
     GM.toast("正在生成专属对战链接，请稍候...", 10000);
 
-    // 提交数据给 Cloudflare Functions API
     fetch('/api/share', {
       method: 'POST',
       headers: {
@@ -514,22 +567,15 @@ var GM = window.GM = window.GM || {};
     .then(function(data) {
       if (data.error) throw new Error(data.error);
 
-      // 从接口拿到生成的短码 id
       var shareUrl = window.location.origin + window.location.pathname + "?id=" + data.id;
       var currentTitle = GM.state.title || "金曲世界杯";
-      var shareText = "我在玩【" + currentTitle + "】的歌曲世界杯，这一局你会怎么选？快来跟我一起试试~ " + shareUrl;
+      // 将生成的文本存入全局变量，等待用户在弹窗中点击复制
+      currentShareText = "我在玩【" + currentTitle + "】的歌曲世界杯，这一局你会怎么选？快来跟我一起试试~ " + shareUrl;
       
-      // 写入剪贴板或弹窗提醒
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(shareText).then(function() {
-          GM.toast("已复制本局短链接，快发给朋友来玩吧~", 2000);
-        }).catch(function() {
-          prompt("请手动复制以下分享文案：", shareText);
-          GM.hideToast();
-        });
-      } else {
-        prompt("请手动复制以下分享文案：", shareText);
-        GM.hideToast();
+      GM.hideToast();
+      // 优雅弹出底部自定义弹窗，代替系统直接弹 prompt 或可能被拦截的 copy
+      if (shareModalMask) {
+         shareModalMask.classList.add("show");
       }
     })
     .catch(function(err) {

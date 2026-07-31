@@ -118,10 +118,12 @@
 .qs-r-actions {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
   width: calc(100% - 40px); max-width: 480px; 
-  display: flex; gap: 10px; justify-content: center; align-items: center; 
+  display: flex; gap: 8px; /* 间距微调 */
+  justify-content: center; align-items: center; 
   background: var(--theme-action-bg, rgba(19, 14, 24, 0.85));
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  padding: 10px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,.15);
+  padding: 8px; /* 【重点】修改为统一 8px，使左右边缘与 38px 的圆按钮实现完美同心圆 */
+  border-radius: 999px; border: 1px solid rgba(255,255,255,.15);
   box-shadow: 0 8px 32px rgba(0,0,0,0.5); z-index: 1000;
 }
 .qs-btn-act { 
@@ -531,4 +533,35 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
   
   .qs-btn-act.icon-only { flex: 0 0 40px; width: 40px; min-width: 40px; height: 40px; min-height: 40px; } 
   .select-btn-rand, .select-btn-submit { min-width: 120px; }
+}
+
+/* ===== 移动端分享弹窗 ===== */
+.share-modal-mask {
+  position: fixed; inset: 0; z-index: 3000; display: none; align-items: flex-end; justify-content: center; padding-bottom: 10%;
+  background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+}
+.share-modal-mask.show { display: flex; }
+.share-modal {
+  width: 90%; max-width: 320px; 
+  background: var(--theme-action-bg, rgba(19, 14, 24, 0.95)); /* 自动跟随歌手主题色 */
+  border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; padding: 24px 20px;
+  text-align: center; position: relative; box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+  animation: slide-up-share 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+.share-modal-close {
+  position: absolute; top: 12px; right: 12px; color: rgba(255,255,255,.5); font-size: 16px; cursor: pointer;
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; transition: color 0.2s;
+}
+.share-modal-close:hover { color: #fff; }
+.share-modal-title { font-size: 17px; font-weight: 700; color: #fff; margin-bottom: 12px; }
+.share-modal-desc { font-size: 14px; color: rgba(255,255,255,.65); margin-bottom: 24px; line-height: 1.5; }
+.share-modal-btn {
+  width: 100%; padding: 12px; border-radius: 999px; border: none; font-size: 15px; font-weight: 700;
+  background: var(--theme-btn-primary, #5b6fc4); color: #fff; cursor: pointer; /* 自动跟随歌手主题色 */
+  box-shadow: 0 4px 16px var(--theme-primary-shadow, rgba(91,111,196,.4)); transition: transform 0.1s, background-color 0.15s;
+}
+.share-modal-btn:active { transform: scale(0.96); }
+@keyframes slide-up-share {
+  from { transform: translateY(40px) scale(0.95); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
 }
