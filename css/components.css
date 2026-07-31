@@ -537,7 +537,7 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
 
 /* ===== 移动端分享弹窗 ===== */
 .share-modal-mask {
-  position: fixed; inset: 0; z-index: 3000; display: none; align-items: flex-end; justify-content: center; padding-bottom: 10%;
+  position: fixed; inset: 0; z-index: 3000; display: none; align-items: flex-end; justify-content: center; padding-bottom: calc(10% + 220px);/* 在原有基础上增加约自身高度的间距 */
   background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
 }
 .share-modal-mask.show { display: flex; }
@@ -564,4 +564,35 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
 @keyframes slide-up-share {
   from { transform: translateY(40px) scale(0.95); opacity: 0; }
   to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* ===== 右上角更多操作下拉菜单 ===== */
+.top-more-mask {
+  position: fixed; inset: 0; z-index: 2999; display: none;
+}
+.top-more-mask.show { display: block; }
+
+.top-more-menu {
+  position: absolute; top: 12px; right: 12px; z-index: 3000;
+  background: var(--theme-action-bg, rgba(19, 14, 24, 0.85));
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px;
+  padding: 6px; min-width: 130px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  display: none; flex-direction: column; gap: 4px;
+  transform-origin: top right;
+  animation: menu-scale-in 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+.top-more-menu.show { display: flex; }
+.top-more-menu .menu-item {
+  padding: 10px 12px; color: #fff; font-size: 14px; font-weight: 600;
+  border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+  transition: background 0.15s;
+}
+.top-more-menu .menu-item:active { background: rgba(255, 255, 255, 0.15); }
+@media (hover: hover) and (pointer: fine) {
+  .top-more-menu .menu-item:hover { background: rgba(255, 255, 255, 0.12); }
+}
+@keyframes menu-scale-in {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
 }

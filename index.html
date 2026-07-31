@@ -15,10 +15,24 @@
   <div class="header-section">
     <div class="header-covers" id="headerCovers"></div>
     <div class="header-gradient" id="headerGradient" style="display:none;"></div>
-    <button id="btnViewToggle" class="btn-view-toggle" title="切换视图">
-      <svg id="iconBracket" viewBox="0 0 24 24"><path d="M22 11V3h-7v3H9V3H2v8h7V8h2v10h4v3h7v-8h-7v3h-2V8h2v3z"/></svg>
-      <svg id="iconHome" style="display:none;" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+    
+    <button id="btnViewToggle" class="btn-view-toggle" title="更多操作" style="display: none;">
+      <svg viewBox="0 0 24 24"><path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
     </button>
+    
+    <div class="top-more-mask" id="topMoreMask"></div>
+    <div class="top-more-menu" id="topMoreMenu">
+      <div class="menu-item" id="menuItemList">
+        <span class="icon">📄</span> 对阵列表
+      </div>
+      <div class="menu-item" id="menuItemBracket">
+        <span class="icon">🆚</span> 晋级视图
+      </div>
+      <div class="menu-item" id="menuItemShare">
+        <span class="icon">🔗</span> 分享这一局
+      </div>
+    </div>
+
     <div class="header-ratio">
       <div class="header-content">
         <input id="titleInput" maxlength="40" placeholder="填写争霸赛标题">
@@ -290,8 +304,6 @@
 
 <div class="toast" id="toast"></div>
 
-<div class="toast" id="toast"></div>
-
 <div class="confirm-mask" id="confirmMask">
   <div class="confirm-box">
     <div class="confirm-msg" id="confirmMsg"></div>
@@ -301,7 +313,6 @@
     </div>
   </div>
 </div>
-
 
 <script src="js/state.js"></script>
 <script src="js/api.js"></script>

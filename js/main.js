@@ -3,6 +3,48 @@ var GM = window.GM = window.GM || {};
 
 (function () {
   "use strict";
+  
+  // 全局标记：判断当前是否是打开了别人分享过来的对局
+  window._isSharedLink = false; 
+
+  // 重写 render 函数，控制右上角“…”按钮的显隐
+  var originalRender = GM.render;
+  GM.render = function () {
+    if (originalRender) originalRender();
+    var btnToggle = document.getElementById("btnViewToggle");
+    if (btnToggle) {
+      if (window._isSharedLink || GM.isInputsEmpty()) {
+        btnToggle.style.display = "none";
+      } else {
+        btnToggle.style.display = "flex";
+      }
+    }
+  };
+
+  // 【核心修复】：重写底层的 switchTab 方法，剥离被删掉的旧版图标，彻底解决切换及初始化白屏/报错问题
+  GM.switchTab = function (isQuick) {
+    GM.isQuickView = isQuick;
+    var viewQuickStart = document.getElementById("viewQuickStart");
+    var viewBracket = document.getElementById("viewBracket");
+    var qsActionsWrap = document.getElementById("qsActionsWrap");
+    var fabReview = document.getElementById("fabReview");
+
+    if (isQuick) {
+      if (viewQuickStart) viewQuickStart.style.display = "flex";
+      if (viewBracket) viewBracket.style.display = "none";
+      if (fabReview) fabReview.classList.remove("show");
+      
+      // 控制底部操作栏显示
+      if (!GM.isInputsEmpty() && qsActionsWrap) {
+        qsActionsWrap.style.display = "block";
+      }
+    } else {
+      if (viewQuickStart) viewQuickStart.style.display = "none";
+      if (viewBracket) viewBracket.style.display = "block";
+      if (qsActionsWrap) qsActionsWrap.style.display = "none";
+      GM.render();
+    }
+  };
 
   /* ===== 自定义确认弹窗 ===== */
   var confirmMask = document.getElementById("confirmMask");
@@ -367,6 +409,10 @@ var GM = window.GM = window.GM || {};
     GM.state.covers = [];
     GM.state.avgColor = null;
     GM.state.allFetchedSongs = [];
+    
+    // 取消分享态并重置界面显示
+    window._isSharedLink = false;
+    
     GM.clearAllWinners();
     var inputs = GM.tbody.querySelectorAll("input[data-idx]");
     for (var k = 0; k < inputs.length; k++) inputs[k].value = GM.state.inputs[k];
@@ -435,6 +481,7 @@ var GM = window.GM = window.GM || {};
       GM.state.avgColor = null;
       for (var k in res.metaData) GM.state.meta[k] = res.metaData[k];
 
+      window._isSharedLink = false;
       GM.clearAllWinners();
       var inputs = GM.tbody.querySelectorAll("input[data-idx]");
       for (var q = 0; q < inputs.length; q++) inputs[q].value = GM.state.inputs[q];
@@ -466,6 +513,7 @@ var GM = window.GM = window.GM || {};
     GM.state.allFetchedSongs = [];
     GM.state.title = "金曲世界杯";
     document.getElementById("titleInput").value = GM.state.title;
+    window._isSharedLink = false;
     GM.clearAllWinners();
     var inputs = GM.tbody.querySelectorAll("input[data-idx]");
     for (var k = 0; k < inputs.length; k++) inputs[k].value = "";
@@ -492,7 +540,6 @@ var GM = window.GM = window.GM || {};
     });
   }
 
-  // 这里的点击是用户的“第一意图直接交互”，在 iOS 下可100%成功触发剪贴板写入
   if (shareModalBtn) {
     shareModalBtn.addEventListener("click", function () {
       if (navigator.clipboard && window.isSecureContext) {
@@ -508,7 +555,6 @@ var GM = window.GM = window.GM || {};
     });
   }
 
-  // 老旧浏览器或无剪贴板权限时的降级复制方案
   function fallbackCopy(text) {
     var textArea = document.createElement("textarea");
     textArea.value = text;
@@ -569,11 +615,9 @@ var GM = window.GM = window.GM || {};
 
       var shareUrl = window.location.origin + window.location.pathname + "?id=" + data.id;
       var currentTitle = GM.state.title || "金曲世界杯";
-      // 将生成的文本存入全局变量，等待用户在弹窗中点击复制
       currentShareText = "我在玩【" + currentTitle + "】的歌曲世界杯，这一局你会怎么选？快来跟我一起试试~ " + shareUrl;
       
       GM.hideToast();
-      // 优雅弹出底部自定义弹窗，代替系统直接弹 prompt 或可能被拦截的 copy
       if (shareModalMask) {
          shareModalMask.classList.add("show");
       }
@@ -588,6 +632,7 @@ var GM = window.GM = window.GM || {};
   if (qsBtnShare1) qsBtnShare1.addEventListener("click", handleShare);
   var qsBtnShare2 = document.getElementById("qsBtnShare2");
   if (qsBtnShare2) qsBtnShare2.addEventListener("click", handleShare);
+  
   // ================================
 
   document.getElementById("qsBtnStartMatch").addEventListener("click", function () {
@@ -643,6 +688,7 @@ var GM = window.GM = window.GM || {};
         GM.state.avgColor = null;
         for (var k in res.metaData) GM.state.meta[k] = res.metaData[k];
 
+        window._isSharedLink = false;
         GM.clearAllWinners();
         var inputs = GM.tbody.querySelectorAll("input[data-idx]");
         for (var q = 0; q < inputs.length; q++) inputs[q].value = GM.state.inputs[q];
@@ -828,6 +874,8 @@ var GM = window.GM = window.GM || {};
     var arr = new Array(currentSelectSize).fill("");
     for (var i = 0; i < tempSelectedSongs.length; i++) arr[i] = tempSelectedSongs[i];
     GM.state.inputs = arr;
+    
+    window._isSharedLink = false;
     GM.clearAllWinners(); 
     var inputs = GM.tbody.querySelectorAll("input[data-idx]");
     for (var q = 0; q < inputs.length; q++) {
@@ -842,10 +890,51 @@ var GM = window.GM = window.GM || {};
   selectMask.addEventListener("click", function(e) { if (e.target === selectMask) selectMask.classList.remove("show"); });
   document.getElementById("qsBtnCustomSelect").addEventListener("click", openSelectModal);
 
-  /* ===== 视图切换与全局初始化 ===== */
-  document.getElementById("btnViewToggle").addEventListener("click", function () {
-    GM.switchTab(!GM.isQuickView);
-  });
+  /* ===== 视图切换、顶部菜单与全局初始化 ===== */
+  var topMoreMenu = document.getElementById("topMoreMenu");
+  var topMoreMask = document.getElementById("topMoreMask");
+
+  function closeTopMenu() {
+    if (topMoreMenu) topMoreMenu.classList.remove("show");
+    if (topMoreMask) topMoreMask.classList.remove("show");
+  }
+
+  // 绑定新的“…”菜单弹窗
+  var btnViewToggle = document.getElementById("btnViewToggle");
+  if (btnViewToggle) {
+    btnViewToggle.addEventListener("click", function () {
+      if (topMoreMenu) topMoreMenu.classList.add("show");
+      if (topMoreMask) topMoreMask.classList.add("show");
+    });
+  }
+
+  if (topMoreMask) topMoreMask.addEventListener("click", closeTopMenu);
+
+  var menuItemList = document.getElementById("menuItemList");
+  if (menuItemList) {
+    menuItemList.addEventListener("click", function() {
+      closeTopMenu();
+      GM.switchTab(true);
+      GM.render(); // 确保切回后状态一致
+    });
+  }
+
+  var menuItemBracket = document.getElementById("menuItemBracket");
+  if (menuItemBracket) {
+    menuItemBracket.addEventListener("click", function() {
+      closeTopMenu();
+      GM.switchTab(false);
+      GM.render();
+    });
+  }
+
+  var menuItemShare = document.getElementById("menuItemShare");
+  if (menuItemShare) {
+    menuItemShare.addEventListener("click", function() {
+      closeTopMenu();
+      if (typeof handleShare === "function") handleShare();
+    });
+  }
 
   function executeShuffle() {
     var filled = [];
@@ -967,9 +1056,15 @@ var GM = window.GM = window.GM || {};
            
            document.getElementById("titleInput").value = GM.state.title;
            
+           // 设置处于被分享状态，阻断右上角“…”菜单
+           window._isSharedLink = true;
+
            // 擦除 URL 上的短码，保持网页清爽
            window.history.replaceState({}, document.title, window.location.pathname);
            
+           // 确保拉取到的分享数据落入本地缓存，防止刷新丢失
+           GM.save(); 
+
            initApp();
            GM.toast("已加载好友分享的对阵列表！", 2500);
         } else {
@@ -979,6 +1074,7 @@ var GM = window.GM = window.GM || {};
       .catch(function(e) {
         console.error("解析分享链接失败:", e);
         GM.toast("分享链接已失效或短码错误", 2500);
+        window._isSharedLink = false;
         initApp(); // 如果加载失败也需保证正常启动渲染
       });
   } else {
