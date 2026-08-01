@@ -903,6 +903,21 @@ var GM = window.GM = window.GM || {};
   var btnViewToggle = document.getElementById("btnViewToggle");
   if (btnViewToggle) {
     btnViewToggle.addEventListener("click", function () {
+      // ===== 新增：动态判断是否显示换封面按钮 =====
+      var menuItemChangeCover = document.getElementById("menuItemChangeCover");
+      if (menuItemChangeCover) {
+        var hasApiCovers = false;
+        var currentInputs = GM.state.inputs || [];
+        for (var i = 0; i < currentInputs.length; i++) {
+          var song = currentInputs[i];
+          if (song && GM.state.meta[song] && GM.state.meta[song].source === 'api' && GM.state.meta[song].artworkUrl100) {
+            hasApiCovers = true;
+            break;
+          }
+        }
+        menuItemChangeCover.style.display = hasApiCovers ? "flex" : "none";
+      }
+
       if (topMoreMenu) topMoreMenu.classList.add("show");
       if (topMoreMask) topMoreMask.classList.add("show");
     });
@@ -933,6 +948,54 @@ var GM = window.GM = window.GM || {};
     menuItemShare.addEventListener("click", function() {
       closeTopMenu();
       if (typeof handleShare === "function") handleShare();
+    });
+  }
+
+  // ===== 新增：换封面按钮逻辑 =====
+  var menuItemChangeCover = document.getElementById("menuItemChangeCover");
+  if (menuItemChangeCover) {
+    menuItemChangeCover.addEventListener("click", function() {
+      closeTopMenu();
+      
+      var validCovers = [];
+      var currentInputs = GM.state.inputs || [];
+      // 提取所有带有封面链接的有效歌曲
+      for (var i = 0; i < currentInputs.length; i++) {
+        var song = currentInputs[i];
+        if (song && GM.state.meta[song] && GM.state.meta[song].source === 'api' && GM.state.meta[song].artworkUrl100) {
+          var url = GM.state.meta[song].artworkUrl100.replace('100x100bb', '600x600bb');
+          if (validCovers.indexOf(url) === -1) {
+            validCovers.push(url);
+          }
+        }
+      }
+
+      if (validCovers.length === 0) {
+        GM.toast("当前没有可用的歌曲封面");
+        return;
+      }
+
+      // 随机洗牌打乱封面数组
+      for (var k = validCovers.length - 1; k > 0; k--) {
+        var j = Math.floor(Math.random() * (k + 1));
+        var tmp = validCovers[k];
+        validCovers[k] = validCovers[j];
+        validCovers[j] = tmp;
+      }
+
+      // 截取前 3 张图片（底层支持 up to 8张，只取前3展现）
+      GM.state.covers = validCovers.slice(0, 3);
+      
+      // 清空当前的均色缓存并持久化状态
+      GM.state.avgColor = null;
+      GM.save();
+      
+      // 调用底层渲染，会自动基于新的 state.covers[0] 重算并平滑过渡主题颜色
+      if (typeof GM.renderHeaderCovers === "function") {
+        GM.renderHeaderCovers();
+      }
+      
+      GM.toast("已更换封面与主题色");
     });
   }
 

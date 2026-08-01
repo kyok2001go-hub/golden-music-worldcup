@@ -160,17 +160,29 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
   }
 };
 
+/* ===== 新增优化：导入时随机抽取封面 ===== */
 GM.extractCoversFromApiRes = function (res) {
-  var newCovers = [];
+  var allCovers = [];
+  
+  // 1. 收集所有的不重复高清封面
   for (var i = 0; i < res.songs.length; i++) {
     var s = res.songs[i];
     if (res.metaData[s] && res.metaData[s].artworkUrl100) {
       var url = res.metaData[s].artworkUrl100.replace('100x100bb', '600x600bb');
-      if (newCovers.indexOf(url) === -1) {
-        newCovers.push(url);
+      if (allCovers.indexOf(url) === -1) {
+        allCovers.push(url);
       }
     }
-    if (newCovers.length >= 8) break;
   }
-  return newCovers;
+
+  // 2. 将收集到的所有封面进行随机洗牌打乱
+  for (var k = allCovers.length - 1; k > 0; k--) {
+    var j = Math.floor(Math.random() * (k + 1));
+    var tmp = allCovers[k];
+    allCovers[k] = allCovers[j];
+    allCovers[j] = tmp;
+  }
+  
+  // 3. 截取前 8 张返回给底层（DOM渲染时会受限高宽样式最终展示 3 张）
+  return allCovers.slice(0, 8);
 };
