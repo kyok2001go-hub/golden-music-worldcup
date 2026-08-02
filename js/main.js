@@ -133,7 +133,6 @@ var GM = window.GM = window.GM || {};
     var sourceCd = document.querySelector('#vsCard' + suffix + ' .vs-card-cd-disc');
     var playerBody = document.querySelector('.cd-player-wrapper .main-body');
     var targetForScale = document.querySelector('.cd-player-wrapper .cd-positioner');
-    // 【核心修复】：获取弹窗主容器，我们将以此为绝对定位的相对基准
     var boxEl = document.querySelector('.vs-box'); 
     
     if (!sourceCd || !playerBody || !boxEl) return;
@@ -141,29 +140,25 @@ var GM = window.GM = window.GM || {};
     GM.currentSourceCd = sourceCd;
     var rectSrc = sourceCd.getBoundingClientRect();
     var rectDst = playerBody.getBoundingClientRect(); 
-    var boxRect = boxEl.getBoundingClientRect(); // 获取弹窗本身的屏幕坐标
+    var boxRect = boxEl.getBoundingClientRect(); 
 
     var flying = sourceCd.cloneNode(true);
     GM.flyingCd = flying;
     
-    // 【核心修复】：将视口的绝对坐标，换算为弹窗内部的相对坐标，抵消遮罩层隔离
     var startLeft = rectSrc.left - boxRect.left + boxEl.scrollLeft;
     var startTop = rectSrc.top - boxRect.top + boxEl.scrollTop;
 
-    // 改为 absolute，挂在弹窗里
     flying.style.position = 'absolute'; 
     flying.style.left = startLeft + 'px';
     flying.style.top = startTop + 'px';
     flying.style.margin = '0';
     flying.style.transform = 'none'; 
-    // zIndex: 15 会完美处于卡片之上，但滑入 .cd-player-wrapper (z-index: 20) 之下！
     flying.style.zIndex = '15'; 
     flying.style.transition = 'none';
-    boxEl.appendChild(flying); // 【核心修复】：挂载到 vs-box 内
+    boxEl.appendChild(flying); 
 
     sourceCd.style.opacity = '0'; 
 
-    // 计算中心悬停与最终落点的相对弹窗坐标
     var centerLeft = window.innerWidth / 2 - boxRect.left - (rectSrc.width / 2) + boxEl.scrollLeft;
     var centerTop = window.innerHeight / 2 - boxRect.top - (rectSrc.height / 2) + boxEl.scrollTop;
     
@@ -171,7 +166,6 @@ var GM = window.GM = window.GM || {};
     var dstTop = rectDst.top - boxRect.top + (rectDst.height / 2) - (rectSrc.height / 2) + boxEl.scrollTop;
     var scaleTarget = targetForScale ? (targetForScale.getBoundingClientRect().width / rectSrc.width) : 0.5;
 
-    // 因为我们是挂在相对坐标起点的，所以需要计算出平移增量差值
     var deltaCenterX = centerLeft - startLeft;
     var deltaCenterY = centerTop - startTop;
     var deltaDstX = dstLeft - startLeft;
@@ -726,7 +720,11 @@ var GM = window.GM = window.GM || {};
     for (var j = 0; j < currentInputs.length; j++) {
       var song = currentInputs[j];
       if (song && GM.state.meta[song] && GM.state.meta[song].source !== 'manual' && GM.state.meta[song].artworkUrl100) {
-        shareMeta[song] = GM.state.meta[song].artworkUrl100;
+        // 【核心修复 1】：分享时把试听链接(previewUrl)一起打包进去
+        shareMeta[song] = {
+            a: GM.state.meta[song].artworkUrl100,
+            p: GM.state.meta[song].previewUrl || ""
+        };
       }
     }
     
@@ -1233,19 +1231,33 @@ var GM = window.GM = window.GM || {};
            GM.state.allFetchedSongs = []; 
            GM.state.winners = GM.makeWinners(GM.state.size);
            
+           // 【核心修复 2】：解析时也要兼容读取试听链接
            GM.state.meta = {};
            if (parsedData.m) {
              for (var songKey in parsedData.m) {
-               GM.state.meta[songKey] = {
-                 artworkUrl100: parsedData.m[songKey],
-                 source: 'api'
-               };
+               var mData = parsedData.m[songKey];
+               if (typeof mData === 'string') {
+                 // 兼容旧版纯封面分享链接
+                 GM.state.meta[songKey] = {
+                   artworkUrl100: mData,
+                   source: 'api'
+                 };
+               } else {
+                 // 新版本：包含图片与试听链接
+                 GM.state.meta[songKey] = {
+                   artworkUrl100: mData.a || "",
+                   previewUrl: mData.p || "",
+                   source: 'api'
+                 };
+               }
              }
            }
            
            document.getElementById("titleInput").value = GM.state.title;
            window._isSharedLink = true;
            window.history.replaceState({}, document.title, window.location.pathname);
+           
+           // 解析完成后，这个覆盖了的 meta 会被保存到本地缓存
            GM.save(); 
            initApp();
            GM.toast("已加载好友分享的对阵列表！", 2500);
