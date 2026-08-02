@@ -395,8 +395,9 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
 }
 
 .cd-player-wrapper .cd-positioner {
-  height: 90%; 
-  aspect-ratio: 1 / 1; 
+  /* 【核心修复】：使用容器单位强制规定绝对长宽，防止在窄托盘(overflow)中被 Flexbox 挤压成椭圆形 */
+  width: 21.1cqw;
+  height: 21.1cqw;
   flex-shrink: 0; 
   display: flex;
   justify-content: center;
