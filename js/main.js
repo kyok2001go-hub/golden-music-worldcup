@@ -103,11 +103,14 @@ var GM = window.GM = window.GM || {};
   }
 
   function updateVsScreen() {
-    var screenEl = document.getElementById("vsPlayerScreen");
-    if (screenEl) {
+    // 【更新核心】：适配纯CSS CD机双行屏幕节点更新
+    var trackEl = document.getElementById("vsPlayerTrack");
+    var timerEl = document.getElementById("vsPlayerTimer");
+    if (trackEl && timerEl) {
       var matchNum = getMatchNumber(vsR, vsI);
       var total = GM.totalMatches();
-      screenEl.innerHTML = "TRACK " + matchNum + "/" + total + "&nbsp;&nbsp;&nbsp;" + formatTime(vsTimerSeconds);
+      trackEl.textContent = matchNum + "/" + total;
+      timerEl.textContent = formatTime(vsTimerSeconds);
     }
   }
 

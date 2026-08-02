@@ -1,5 +1,8 @@
 /* ===== components.css — 弹窗、按钮、组件 ===== */
 
+/* 引入类似液晶显示的数码字体，专门服务于 CD 机的数字显示屏 */
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
 /* ===== 通用按钮 ===== */
 .btn {
   border-radius: 999px;
@@ -226,14 +229,22 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
   .vs-card.disabled:hover { border-color: rgba(255,255,255,.1); background: rgba(255,255,255,.03); }
 }
 .vs-card:active { transform: scale(.97); }
-.vs-card.picked { border-color: #c498ff; background: rgba(196,152,255,.16); box-shadow: 0 4px 16px rgba(196,152,255,.15); }
+
+/* 【核心修改】：对阵卡片选中状态的高亮背景和边框现已支持主题色自适应 */
+.vs-card.picked { 
+  border-color: var(--theme-btn-primary, #c498ff); 
+  background: var(--theme-picked-bg, rgba(196,152,255,.16)); 
+  box-shadow: 0 4px 16px var(--theme-primary-shadow, rgba(196,152,255,.15)); 
+}
 .vs-card.disabled { border-color: rgba(255,255,255,.1); background: rgba(255,255,255,.03); cursor: not-allowed; opacity: 0.7; }
 
 .vs-card-name {
   font-size: 16px; font-weight: 700; color: #f0f1f8; margin-bottom: 24px; min-height: 44px;
   display: flex; align-items: center; justify-content: center; word-break: break-all; line-height: 1.4;
 }
-.vs-card.picked .vs-card-name { color: #c498ff; }
+
+/* 【核心修改】：选中状态的卡片文字颜色现已支持主题色自适应 */
+.vs-card.picked .vs-card-name { color: var(--theme-btn-primary, #c498ff); }
 
 .vs-card-disc-group { position: relative; width: 140px; height: 140px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 #vsCardA .vs-card-disc-group { transform: translateX(-15%); }
@@ -261,18 +272,180 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
 
 .vs-mid { display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.4); font-size: 14px; font-weight: 700; padding: 0 4px; }
 
+
+/* ===== 新对决弹窗：纯 CSS CD 机包裹区 ===== */
 .vs-player-wrap {
   flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
   padding: 30px 0 20px; margin-top: auto;
 }
-.vs-player-inner { position: relative; display: inline-block; width: 60%; }
-.vs-player-img { width: 100%; height: auto; display: block; pointer-events: none; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.4)); }
-.vs-player-screen {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  font-size: 12px; color: rgba(255,255,255,0.85);
-  font-family: 'Courier New', Consolas, monospace; font-variant-numeric: tabular-nums;
-  white-space: nowrap; display: flex; gap: 12px; letter-spacing: 0.5px; font-weight: 600;
+
+.cd-player-wrapper {
+  width: 60%; 
+  max-width: 1200px;
+  min-width: 250px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  container-type: inline-size;
+  filter: drop-shadow(0 10px 20px rgba(0,0,0,0.4));
 }
+
+.cd-player-wrapper .main-body {
+  width: 100%;
+  aspect-ratio: 3.2 / 1;
+  display: flex;
+  background-color: var(--theme-btn-primary, #383958); /* 改为自适应主题色，默认无提取色时为 #383958 */
+  border-radius: 1cqw; 
+  box-shadow: 
+    0 15px 30px rgba(0,0,0,0.15), 
+    inset 0 -2px 10px rgba(0,0,0,0.05);
+  border-top: 3px solid rgba(255, 255, 255, 0.1); /* 改为与对阵卡片初始边框一致的颜色 */
+  overflow: hidden;
+  position: relative;
+}
+
+.cd-player-wrapper .speaker {
+  width: 28%;
+  height: 100%;
+  background-color: var(--theme-btn-primary, #383958); /* 同步自适应 */
+  background-image: radial-gradient(rgba(0, 0, 0, 0.15) 25%, transparent 25%); /* 孔洞改为半透明黑色，使其能随任何动态背景颜色自适应变深 */
+  background-size: 0.7cqw 0.7cqw; 
+  background-position: center;
+  box-shadow: inset 0 0 2cqw rgba(0,0,0,0.1);
+}
+
+.cd-player-wrapper .screen {
+  width: 18%;
+  height: 100%;
+  background: linear-gradient(115deg, #181818 45%, #0d0d0d 45.2%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center; 
+  box-sizing: border-box;
+  box-shadow: 3px 0 10px rgba(0,0,0,0.3);
+  z-index: 2;
+  font-family: 'Share Tech Mono', 'Courier New', monospace;
+}
+
+.cd-player-wrapper .screen-track {
+  color: #e0e0e0;
+  width: 90%; /* 拓宽边界，以免大字溢出 */
+  text-align: center;
+  font-size: 4cqw; /* 放大到与计时字号一致 */
+  opacity: 0.8;
+  margin-bottom: 1.2cqw; /* 【核心修改】：增大50%的垂直间距 */
+  text-shadow: 0 0 5px rgba(255,255,255,0.4);
+  white-space: nowrap;
+}
+
+.cd-player-wrapper .screen-text {
+  color: #e0e0e0;
+  width: 90%; 
+  text-align: center;
+  font-size: 4cqw; 
+  opacity: 0.95;
+  text-shadow: 0 0 8px rgba(255,255,255,0.5);
+  white-space: nowrap;
+}
+
+.cd-player-wrapper .cd-section {
+  width: 26%;
+  height: 100%; 
+  position: relative;
+  display: flex;
+  align-items: center; 
+  background-color: var(--theme-btn-primary, #383958); /* 同步自适应 */
+}
+
+.cd-player-wrapper .brand-logo {
+  position: absolute;
+  left: 4%;
+  font-size: 1cqw;
+  font-family: sans-serif;
+  color: rgba(0, 0, 0, 0.4); /* 使用半透明黑色，适应更多背景色 */
+  font-weight: 900;
+  z-index: 3;
+}
+
+.cd-player-wrapper .cd-tray {
+  width: 68%;
+  height: 75%;
+  background-color: #1a1a1a;
+  border-radius: 0.5cqw;
+  margin-left: auto;
+  margin-right: 5%;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center; 
+  box-shadow: 
+    inset 0 1cqw 2cqw rgba(0,0,0,0.8),
+    0 2px 5px rgba(255,255,255,0.3);
+  position: relative;
+  overflow: hidden; 
+}
+
+.cd-player-wrapper .cd-tray::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(115deg, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0) 50.2%);
+  pointer-events: none;
+  z-index: 2; 
+}
+
+.cd-player-wrapper .cd-positioner {
+  height: 90%; 
+  aspect-ratio: 1 / 1; 
+  flex-shrink: 0; 
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transform: translateX(-30%);
+}
+
+.cd-player-wrapper .css-cd {
+  width: 100%; 
+  height: 100%; 
+  border-radius: 50%;
+  background: conic-gradient(
+    #d5d0e5 0deg, #f0e6f5 60deg, #cde3e5 120deg, 
+    #e8d5f0 180deg, #cde3e5 240deg, #f0e6f5 300deg, #d5d0e5 360deg
+  );
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+  animation: spin 3s linear infinite; 
+}
+
+.cd-player-wrapper .cd-center {
+  width: 25%;
+  height: 25%;
+  border-radius: 50%;
+  background-color: #1a1a1a; 
+  box-shadow: 0 0 0 0.8cqw rgba(255, 255, 255, 0.4); 
+}
+
+@keyframes spin {
+  100% { transform: rotate(360deg); }
+}
+
+.cd-player-wrapper .player-base {
+  width: 44%; 
+  height: 6cqw;
+  background-color: #1c1c1c;
+  clip-path: polygon(
+    0 0, 
+    100% 0, 
+    calc(100% - 0.97cqw) 50%, 
+    100% 100%, 
+    0 100%, 
+    0.97cqw 50%
+  );
+  box-shadow: 0 15px 15px rgba(0,0,0,0.2);
+}
+
 
 .vs-foot { padding: 12px 16px 24px; }
 .vs-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -307,9 +480,11 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
   .vs-card-cd-disc { font-size: 76px; margin-top: -38px;}
   #vsCardA .vs-card-disc-group { transform: translateX(-18%); }
   #vsCardB .vs-card-disc-group { transform: translateX(18%); }
+  
   .vs-player-wrap { margin-top: auto; padding: 4vh 0 3vh; flex: 0 0 auto; }
-  .vs-player-inner { width: 75%; }
-  .vs-player-screen { font-size: 11px; }
+  /* 【移动端自适应】：在较窄屏幕时放宽尺寸占用比例以保证显示清晰度 */
+  .cd-player-wrapper { width: 80%; }
+  
   .vs-foot { padding: 0 20px 50px; flex: 0 0 auto; }
   .vs-progress-track { bottom: 24px; }
 }
