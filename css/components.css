@@ -230,7 +230,6 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
 }
 .vs-card:active { transform: scale(.97); }
 
-/* 【核心修改】：对阵卡片选中状态的高亮背景和边框现已支持主题色自适应 */
 .vs-card.picked { 
   border-color: var(--theme-btn-primary, #c498ff); 
   background: var(--theme-picked-bg, rgba(196,152,255,.16)); 
@@ -243,7 +242,6 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
   display: flex; align-items: center; justify-content: center; word-break: break-all; line-height: 1.4;
 }
 
-/* 【核心修改】：选中状态的卡片文字颜色现已支持主题色自适应 */
 .vs-card.picked .vs-card-name { color: var(--theme-btn-primary, #c498ff); }
 
 .vs-card-disc-group { position: relative; width: 140px; height: 140px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -259,6 +257,45 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
 }
 .vs-card-cover img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
 .vs-card-cover .emoji { font-size: 64px; filter: drop-shadow(0 4px 8px rgba(0,0,0,.4)); pointer-events: none; opacity: 1; color: white;}
+
+/* ===== 试听播放按钮 ===== */
+.btn-preview {
+  position: absolute;
+  bottom: 6px; right: 6px;
+  width: 32px; height: 32px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; z-index: 10;
+  transition: all 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+/* 【核心修改】：通过伪元素向四周扩展 12px，加大点击热区防误触 */
+.btn-preview::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .btn-preview:hover {
+    background: rgba(0, 0, 0, 0.75);
+    transform: scale(1.1);
+  }
+}
+.btn-preview:active { transform: scale(0.9); }
+.btn-preview.playing {
+  background: var(--theme-btn-primary, #5b6fc4);
+  animation: preview-pulse 1.5s infinite;
+  border-color: transparent;
+}
+.btn-preview svg { width: 16px; height: 16px; fill: #fff; position: relative; z-index: 2; pointer-events: none; }
+.btn-preview:not(.playing) svg { margin-left: 2px; }
+@keyframes preview-pulse {
+  0% { box-shadow: 0 0 0 0 var(--theme-primary-shadow, rgba(91,111,196,0.6)); }
+  70% { box-shadow: 0 0 0 8px rgba(91,111,196,0); }
+  100% { box-shadow: 0 0 0 0 rgba(91,111,196,0); }
+}
 
 .vs-card-cd-disc {
   position: absolute; top: 50%; margin-top: -50px;
@@ -288,18 +325,21 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
   align-items: center;
   container-type: inline-size;
   filter: drop-shadow(0 10px 20px rgba(0,0,0,0.4));
+  /* 【核心修改】：设定明确的 z-index 为 20，让其能够覆盖住从上方飞来的 z-index 15 的 CD */
+  position: relative;
+  z-index: 20;
 }
 
 .cd-player-wrapper .main-body {
   width: 100%;
   aspect-ratio: 3.2 / 1;
   display: flex;
-  background-color: var(--theme-btn-primary, #383958); /* 改为自适应主题色，默认无提取色时为 #383958 */
+  background-color: var(--theme-btn-primary, #383958); 
   border-radius: 1cqw; 
   box-shadow: 
     0 15px 30px rgba(0,0,0,0.15), 
     inset 0 -2px 10px rgba(0,0,0,0.05);
-  border-top: 3px solid rgba(255, 255, 255, 0.1); /* 改为与对阵卡片初始边框一致的颜色 */
+  border-top: 3px solid rgba(255, 255, 255, 0.1); 
   overflow: hidden;
   position: relative;
 }
@@ -307,8 +347,8 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
 .cd-player-wrapper .speaker {
   width: 28%;
   height: 100%;
-  background-color: var(--theme-btn-primary, #383958); /* 同步自适应 */
-  background-image: radial-gradient(rgba(0, 0, 0, 0.15) 25%, transparent 25%); /* 孔洞改为半透明黑色，使其能随任何动态背景颜色自适应变深 */
+  background-color: var(--theme-btn-primary, #383958); 
+  background-image: radial-gradient(rgba(0, 0, 0, 0.15) 25%, transparent 25%); 
   background-size: 0.7cqw 0.7cqw; 
   background-position: center;
   box-shadow: inset 0 0 2cqw rgba(0,0,0,0.1);
@@ -330,11 +370,11 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
 
 .cd-player-wrapper .screen-track {
   color: #e0e0e0;
-  width: 90%; /* 拓宽边界，以免大字溢出 */
+  width: 90%; 
   text-align: center;
-  font-size: 4cqw; /* 放大到与计时字号一致 */
+  font-size: 4cqw; 
   opacity: 0.8;
-  margin-bottom: 1.2cqw; /* 【核心修改】：增大50%的垂直间距 */
+  margin-bottom: 1.2cqw; 
   text-shadow: 0 0 5px rgba(255,255,255,0.4);
   white-space: nowrap;
 }
@@ -355,7 +395,7 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
   position: relative;
   display: flex;
   align-items: center; 
-  background-color: var(--theme-btn-primary, #383958); /* 同步自适应 */
+  background-color: var(--theme-btn-primary, #383958); 
 }
 
 .cd-player-wrapper .brand-logo {
@@ -363,7 +403,7 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
   left: 4%;
   font-size: 1cqw;
   font-family: sans-serif;
-  color: rgba(0, 0, 0, 0.4); /* 使用半透明黑色，适应更多背景色 */
+  color: rgba(0, 0, 0, 0.4); 
   font-weight: 900;
   z-index: 3;
 }
@@ -395,7 +435,6 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
 }
 
 .cd-player-wrapper .cd-positioner {
-  /* 【核心修复】：使用容器单位强制规定绝对长宽，防止在窄托盘(overflow)中被 Flexbox 挤压成椭圆形 */
   width: 21.1cqw;
   height: 21.1cqw;
   flex-shrink: 0; 
@@ -713,13 +752,13 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
 
 /* ===== 移动端分享弹窗 ===== */
 .share-modal-mask {
-  position: fixed; inset: 0; z-index: 3000; display: none; align-items: flex-end; justify-content: center; padding-bottom: calc(10% + 220px);/* 在原有基础上增加约自身高度的间距 */
+  position: fixed; inset: 0; z-index: 3000; display: none; align-items: flex-end; justify-content: center; padding-bottom: calc(10% + 220px);
   background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
 }
 .share-modal-mask.show { display: flex; }
 .share-modal {
   width: 90%; max-width: 320px; 
-  background: var(--theme-action-bg, rgba(19, 14, 24, 0.95)); /* 自动跟随歌手主题色 */
+  background: var(--theme-action-bg, rgba(19, 14, 24, 0.95)); 
   border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; padding: 24px 20px;
   text-align: center; position: relative; box-shadow: 0 16px 40px rgba(0,0,0,0.5);
   animation: slide-up-share 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
@@ -733,7 +772,7 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
 .share-modal-desc { font-size: 14px; color: rgba(255,255,255,.65); margin-bottom: 24px; line-height: 1.5; }
 .share-modal-btn {
   width: 100%; padding: 12px; border-radius: 999px; border: none; font-size: 15px; font-weight: 700;
-  background: var(--theme-btn-primary, #5b6fc4); color: #fff; cursor: pointer; /* 自动跟随歌手主题色 */
+  background: var(--theme-btn-primary, #5b6fc4); color: #fff; cursor: pointer; 
   box-shadow: 0 4px 16px var(--theme-primary-shadow, rgba(91,111,196,.4)); transition: transform 0.1s, background-color 0.15s;
 }
 .share-modal-btn:active { transform: scale(0.96); }

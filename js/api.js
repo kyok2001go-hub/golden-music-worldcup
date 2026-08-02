@@ -102,9 +102,9 @@ GM.handleSongs = function (name, data) {
       collectionName: it.collectionName || "",
       releaseDate: it.releaseDate || "",
       artworkUrl100: it.artworkUrl100 || "",
+      previewUrl: it.previewUrl || "", // 【核心修改】：添加试听链接缓存
       source: 'api'
     };
-    // V2.3: 去掉截断逻辑，最大化收集200首歌曲，以便后续「自选」
   }
   return { songs: songs, metaData: metaData };
 };
@@ -160,11 +160,8 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
   }
 };
 
-/* ===== 新增优化：导入时随机抽取封面 ===== */
 GM.extractCoversFromApiRes = function (res) {
   var allCovers = [];
-  
-  // 1. 收集所有的不重复高清封面
   for (var i = 0; i < res.songs.length; i++) {
     var s = res.songs[i];
     if (res.metaData[s] && res.metaData[s].artworkUrl100) {
@@ -175,14 +172,11 @@ GM.extractCoversFromApiRes = function (res) {
     }
   }
 
-  // 2. 将收集到的所有封面进行随机洗牌打乱
   for (var k = allCovers.length - 1; k > 0; k--) {
     var j = Math.floor(Math.random() * (k + 1));
     var tmp = allCovers[k];
     allCovers[k] = allCovers[j];
     allCovers[j] = tmp;
   }
-  
-  // 3. 截取前 8 张返回给底层（DOM渲染时会受限高宽样式最终展示 3 张）
   return allCovers.slice(0, 8);
 };

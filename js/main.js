@@ -4,10 +4,8 @@ var GM = window.GM = window.GM || {};
 (function () {
   "use strict";
   
-  // 全局标记：判断当前是否是打开了别人分享过来的对局
   window._isSharedLink = false; 
 
-  // 重写 render 函数，控制右上角“…”按钮的显隐
   var originalRender = GM.render;
   GM.render = function () {
     if (originalRender) originalRender();
@@ -21,7 +19,6 @@ var GM = window.GM = window.GM || {};
     }
   };
 
-  // 【核心修复】：重写底层的 switchTab 方法，剥离被删掉的旧版图标，彻底解决切换及初始化白屏/报错问题
   GM.switchTab = function (isQuick) {
     GM.isQuickView = isQuick;
     var viewQuickStart = document.getElementById("viewQuickStart");
@@ -33,8 +30,6 @@ var GM = window.GM = window.GM || {};
       if (viewQuickStart) viewQuickStart.style.display = "flex";
       if (viewBracket) viewBracket.style.display = "none";
       if (fabReview) fabReview.classList.remove("show");
-      
-      // 控制底部操作栏显示
       if (!GM.isInputsEmpty() && qsActionsWrap) {
         qsActionsWrap.style.display = "block";
       }
@@ -73,6 +68,133 @@ var GM = window.GM = window.GM || {};
     if (e.target === confirmMask) hideConfirm();
   });
 
+  /* ===== 试听控制逻辑 ===== */
+  GM.currentAudio = null;
+  GM.currentSourceCd = null;
+  GM.flyingCd = null;
+
+  GM.stopPreview = function() {
+    if (GM.currentAudio) {
+      GM.currentAudio.pause();
+      GM.currentAudio = null;
+    }
+    if (GM.currentSourceCd) {
+      GM.currentSourceCd.style.opacity = '';
+      GM.currentSourceCd = null;
+    }
+    if (GM.flyingCd) {
+      GM.flyingCd.remove();
+      GM.flyingCd = null;
+    }
+    var playingBtns = document.querySelectorAll('.btn-preview.playing');
+    for(var i=0; i<playingBtns.length; i++) {
+      playingBtns[i].classList.remove('playing');
+      playingBtns[i].innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+    }
+  };
+
+  var vsCardsContainer = document.querySelector('.vs-cards');
+  if (vsCardsContainer) {
+    vsCardsContainer.addEventListener('click', function(e) {
+      var btn = e.target.closest('.btn-preview');
+      if (btn) {
+        e.stopPropagation(); 
+        var val = btn.getAttribute('data-val');
+        var suffix = btn.getAttribute('data-suffix');
+        
+        if (btn.classList.contains('playing')) {
+          GM.stopPreview();
+        } else {
+          GM.playPreview(val, suffix, btn);
+        }
+      }
+    });
+  }
+
+  GM.playPreview = function(value, suffix, btn) {
+    var url = GM.state.meta[value] && GM.state.meta[value].previewUrl;
+    if (!url) return;
+
+    GM.stopPreview(); 
+
+    GM.currentAudio = new Audio(url);
+    var playPromise = GM.currentAudio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(function(error) {
+        console.warn("Audio play prevented:", error);
+        GM.stopPreview();
+      });
+    }
+
+    btn.classList.add('playing');
+    btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>'; 
+    GM.currentAudio.onended = GM.stopPreview;
+
+    var sourceCd = document.querySelector('#vsCard' + suffix + ' .vs-card-cd-disc');
+    var playerBody = document.querySelector('.cd-player-wrapper .main-body');
+    var targetForScale = document.querySelector('.cd-player-wrapper .cd-positioner');
+    // 【核心修复】：获取弹窗主容器，我们将以此为绝对定位的相对基准
+    var boxEl = document.querySelector('.vs-box'); 
+    
+    if (!sourceCd || !playerBody || !boxEl) return;
+
+    GM.currentSourceCd = sourceCd;
+    var rectSrc = sourceCd.getBoundingClientRect();
+    var rectDst = playerBody.getBoundingClientRect(); 
+    var boxRect = boxEl.getBoundingClientRect(); // 获取弹窗本身的屏幕坐标
+
+    var flying = sourceCd.cloneNode(true);
+    GM.flyingCd = flying;
+    
+    // 【核心修复】：将视口的绝对坐标，换算为弹窗内部的相对坐标，抵消遮罩层隔离
+    var startLeft = rectSrc.left - boxRect.left + boxEl.scrollLeft;
+    var startTop = rectSrc.top - boxRect.top + boxEl.scrollTop;
+
+    // 改为 absolute，挂在弹窗里
+    flying.style.position = 'absolute'; 
+    flying.style.left = startLeft + 'px';
+    flying.style.top = startTop + 'px';
+    flying.style.margin = '0';
+    flying.style.transform = 'none'; 
+    // zIndex: 15 会完美处于卡片之上，但滑入 .cd-player-wrapper (z-index: 20) 之下！
+    flying.style.zIndex = '15'; 
+    flying.style.transition = 'none';
+    boxEl.appendChild(flying); // 【核心修复】：挂载到 vs-box 内
+
+    sourceCd.style.opacity = '0'; 
+
+    // 计算中心悬停与最终落点的相对弹窗坐标
+    var centerLeft = window.innerWidth / 2 - boxRect.left - (rectSrc.width / 2) + boxEl.scrollLeft;
+    var centerTop = window.innerHeight / 2 - boxRect.top - (rectSrc.height / 2) + boxEl.scrollTop;
+    
+    var dstLeft = rectDst.left - boxRect.left + (rectDst.width / 2) - (rectSrc.width / 2) + boxEl.scrollLeft;
+    var dstTop = rectDst.top - boxRect.top + (rectDst.height / 2) - (rectSrc.height / 2) + boxEl.scrollTop;
+    var scaleTarget = targetForScale ? (targetForScale.getBoundingClientRect().width / rectSrc.width) : 0.5;
+
+    // 因为我们是挂在相对坐标起点的，所以需要计算出平移增量差值
+    var deltaCenterX = centerLeft - startLeft;
+    var deltaCenterY = centerTop - startTop;
+    var deltaDstX = dstLeft - startLeft;
+    var deltaDstY = dstTop - startTop;
+
+    var keyframes = [
+      { transform: 'translate(0px, 0px) scale(1)' },
+      { transform: 'translate(' + deltaCenterX + 'px, ' + deltaCenterY + 'px) scale(1.2)', offset: 0.35 },
+      { transform: 'translate(' + deltaCenterX + 'px, ' + deltaCenterY + 'px) scale(1.2)', offset: 0.65 },
+      { transform: 'translate(' + deltaDstX + 'px, ' + deltaDstY + 'px) scale(' + scaleTarget + ')' }
+    ];
+
+    var anim = flying.animate(keyframes, {
+      duration: 1500,
+      easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+      fill: 'forwards'
+    });
+
+    anim.onfinish = function() {
+      flying.style.opacity = '0'; 
+    };
+  };
+
   /* ===== 对阵选择弹窗 ===== */
   var vsMask = document.getElementById("vsMask");
   var vsTitle = document.getElementById("vsTitle");
@@ -103,7 +225,6 @@ var GM = window.GM = window.GM || {};
   }
 
   function updateVsScreen() {
-    // 【更新核心】：适配纯CSS CD机双行屏幕节点更新
     var trackEl = document.getElementById("vsPlayerTrack");
     var timerEl = document.getElementById("vsPlayerTimer");
     if (trackEl && timerEl) {
@@ -134,6 +255,7 @@ var GM = window.GM = window.GM || {};
   function closePopup() {
     vsMask.classList.remove("show");
     stopVsTimer();
+    GM.stopPreview(); 
   }
 
   function findNextMatch(fromR, fromI) {
@@ -187,7 +309,14 @@ var GM = window.GM = window.GM || {};
         coverEl.innerHTML = '<span class="emoji">🎵</span>';
       } else {
         var hdUrl = GM.state.meta[value].artworkUrl100.replace('100x100bb', '400x400bb');
-        coverEl.innerHTML = '<img src="' + hdUrl + '" alt="cover" onerror="this.parentElement.innerHTML=\'<span class=\\\'emoji\\\'>🎵</span>\';">';
+        var html = '<img src="' + hdUrl + '" alt="cover" onerror="this.parentElement.innerHTML=\'<span class=\\\'emoji\\\'>🎵</span>\';">';
+        
+        if (GM.state.meta[value].previewUrl) {
+          html += '<div class="btn-preview" data-val="' + GM.esc(value) + '" data-suffix="' + suffix + '" title="试听片段">' +
+                  '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>' +
+                  '</div>';
+        }
+        coverEl.innerHTML = html;
       }
     }
     setCard('A', src[0]);
@@ -215,6 +344,8 @@ var GM = window.GM = window.GM || {};
     if (GM.state.winners[vsR][vsI] !== null) return;
     isPicking = true;
     cardEl.classList.add("picked");
+    
+    GM.stopPreview(); 
 
     setTimeout(function () {
       GM.state.winners[vsR][vsI] = value;
@@ -255,14 +386,22 @@ var GM = window.GM = window.GM || {};
     }, 300);
   }
 
-  document.getElementById("vsCardA").addEventListener("click", function () { pickWinner(GM.getSources(vsR, vsI)[0], document.getElementById("vsCardA")); });
-  document.getElementById("vsCardB").addEventListener("click", function () { pickWinner(GM.getSources(vsR, vsI)[1], document.getElementById("vsCardB")); });
+  document.getElementById("vsCardA").addEventListener("click", function (e) { 
+    if(e.target.closest('.btn-preview')) return; 
+    pickWinner(GM.getSources(vsR, vsI)[0], document.getElementById("vsCardA")); 
+  });
+  document.getElementById("vsCardB").addEventListener("click", function (e) { 
+    if(e.target.closest('.btn-preview')) return; 
+    pickWinner(GM.getSources(vsR, vsI)[1], document.getElementById("vsCardB")); 
+  });
+
   vsClear.addEventListener("click", function () {
     if (GM.state.winners[vsR][vsI] === null) return;
     GM.clearNode(vsR, vsI);
     GM.save(); GM.render();
     renderVsCards();
     updateVsProgress();
+    GM.stopPreview(); 
   });
   document.getElementById("vsClose").addEventListener("click", closePopup);
   vsMask.addEventListener("click", function (e) { if (e.target === vsMask) closePopup(); });
@@ -413,7 +552,6 @@ var GM = window.GM = window.GM || {};
     GM.state.avgColor = null;
     GM.state.allFetchedSongs = [];
     
-    // 取消分享态并重置界面显示
     window._isSharedLink = false;
     
     GM.clearAllWinners();
@@ -902,11 +1040,9 @@ var GM = window.GM = window.GM || {};
     if (topMoreMask) topMoreMask.classList.remove("show");
   }
 
-  // 绑定新的“…”菜单弹窗
   var btnViewToggle = document.getElementById("btnViewToggle");
   if (btnViewToggle) {
     btnViewToggle.addEventListener("click", function () {
-      // ===== 新增：动态判断是否显示换封面按钮 =====
       var menuItemChangeCover = document.getElementById("menuItemChangeCover");
       if (menuItemChangeCover) {
         var hasApiCovers = false;
@@ -933,7 +1069,7 @@ var GM = window.GM = window.GM || {};
     menuItemList.addEventListener("click", function() {
       closeTopMenu();
       GM.switchTab(true);
-      GM.render(); // 确保切回后状态一致
+      GM.render(); 
     });
   }
 
@@ -954,7 +1090,6 @@ var GM = window.GM = window.GM || {};
     });
   }
 
-  // ===== 新增：换封面按钮逻辑 =====
   var menuItemChangeCover = document.getElementById("menuItemChangeCover");
   if (menuItemChangeCover) {
     menuItemChangeCover.addEventListener("click", function() {
@@ -962,7 +1097,6 @@ var GM = window.GM = window.GM || {};
       
       var validCovers = [];
       var currentInputs = GM.state.inputs || [];
-      // 提取所有带有封面链接的有效歌曲
       for (var i = 0; i < currentInputs.length; i++) {
         var song = currentInputs[i];
         if (song && GM.state.meta[song] && GM.state.meta[song].source === 'api' && GM.state.meta[song].artworkUrl100) {
@@ -978,7 +1112,6 @@ var GM = window.GM = window.GM || {};
         return;
       }
 
-      // 随机洗牌打乱封面数组
       for (var k = validCovers.length - 1; k > 0; k--) {
         var j = Math.floor(Math.random() * (k + 1));
         var tmp = validCovers[k];
@@ -986,18 +1119,13 @@ var GM = window.GM = window.GM || {};
         validCovers[j] = tmp;
       }
 
-      // 截取前 3 张图片（底层支持 up to 8张，只取前3展现）
       GM.state.covers = validCovers.slice(0, 3);
-      
-      // 清空当前的均色缓存并持久化状态
       GM.state.avgColor = null;
       GM.save();
       
-      // 调用底层渲染，会自动基于新的 state.covers[0] 重算并平滑过渡主题颜色
       if (typeof GM.renderHeaderCovers === "function") {
         GM.renderHeaderCovers();
       }
-      
       GM.toast("已更换封面与主题色");
     });
   }
@@ -1068,7 +1196,6 @@ var GM = window.GM = window.GM || {};
   document.getElementById("sizeSelect").addEventListener("change", function (e) { handleSizeChange(+e.target.value); });
   document.getElementById("qsSizeSelect").addEventListener("change", function (e) { handleSizeChange(+e.target.value); });
 
-  /* ===== 提取的通用渲染启动 ===== */
   function initApp() {
     GM.buildTable();
     syncSizeSeg();
@@ -1076,7 +1203,6 @@ var GM = window.GM = window.GM || {};
     GM.render();
   }
 
-  /* ===== 启动与路由解析 ===== */
   try {
     for (var lk = 0; lk < GM.LS_KEY_LEGACY.length; lk++) {
       if (localStorage.getItem(GM.LS_KEY_LEGACY[lk]) !== null) localStorage.removeItem(GM.LS_KEY_LEGACY[lk]);
@@ -1086,9 +1212,8 @@ var GM = window.GM = window.GM || {};
   GM.load();
   if (!GM.SIZE_CONFIG[GM.state.size]) GM.state.size = 64;
 
-  // KV Functions 代理分享链接解析逻辑
   var params = new URLSearchParams(window.location.search);
-  var shareId = params.get("id"); // 从 URL 提取短码参数 id
+  var shareId = params.get("id"); 
 
   if (shareId) {
     GM.toast("正在加载好友分享的对阵列表...", 60000);
@@ -1103,13 +1228,11 @@ var GM = window.GM = window.GM || {};
            GM.state.title = parsedData.t || "好友分享的金曲世界杯";
            GM.state.inputs = parsedData.i;
            
-           // 还原封面，并清空自选缓存
            GM.state.covers = parsedData.c || [];
            GM.state.avgColor = null; 
            GM.state.allFetchedSongs = []; 
            GM.state.winners = GM.makeWinners(GM.state.size);
            
-           // 还原对阵弹窗的局部封面
            GM.state.meta = {};
            if (parsedData.m) {
              for (var songKey in parsedData.m) {
@@ -1121,16 +1244,9 @@ var GM = window.GM = window.GM || {};
            }
            
            document.getElementById("titleInput").value = GM.state.title;
-           
-           // 设置处于被分享状态，阻断右上角“…”菜单
            window._isSharedLink = true;
-
-           // 擦除 URL 上的短码，保持网页清爽
            window.history.replaceState({}, document.title, window.location.pathname);
-           
-           // 确保拉取到的分享数据落入本地缓存，防止刷新丢失
            GM.save(); 
-
            initApp();
            GM.toast("已加载好友分享的对阵列表！", 2500);
         } else {
@@ -1141,10 +1257,9 @@ var GM = window.GM = window.GM || {};
         console.error("解析分享链接失败:", e);
         GM.toast("分享链接已失效或短码错误", 2500);
         window._isSharedLink = false;
-        initApp(); // 如果加载失败也需保证正常启动渲染
+        initApp(); 
       });
   } else {
-    // 正常启动
     initApp();
   }
 
