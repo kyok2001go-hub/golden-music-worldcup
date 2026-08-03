@@ -4,10 +4,8 @@ var GM = window.GM = window.GM || {};
 (function () {
   "use strict";
   
-  // 全局标记：判断当前是否是打开了别人分享过来的对局
   window._isSharedLink = false; 
 
-  // 重写 render 函数，控制右上角“…”按钮的显隐
   var originalRender = GM.render;
   GM.render = function () {
     if (originalRender) originalRender();
@@ -21,7 +19,6 @@ var GM = window.GM = window.GM || {};
     }
   };
 
-  // 【核心修复】：重写底层的 switchTab 方法，剥离被删掉的旧版图标，彻底解决切换及初始化白屏/报错问题
   GM.switchTab = function (isQuick) {
     GM.isQuickView = isQuick;
     var viewQuickStart = document.getElementById("viewQuickStart");
@@ -33,8 +30,6 @@ var GM = window.GM = window.GM || {};
       if (viewQuickStart) viewQuickStart.style.display = "flex";
       if (viewBracket) viewBracket.style.display = "none";
       if (fabReview) fabReview.classList.remove("show");
-      
-      // 控制底部操作栏显示
       if (!GM.isInputsEmpty() && qsActionsWrap) {
         qsActionsWrap.style.display = "block";
       }
@@ -73,6 +68,127 @@ var GM = window.GM = window.GM || {};
     if (e.target === confirmMask) hideConfirm();
   });
 
+  /* ===== 试听控制逻辑 ===== */
+  GM.currentAudio = null;
+  GM.currentSourceCd = null;
+  GM.flyingCd = null;
+
+  GM.stopPreview = function() {
+    if (GM.currentAudio) {
+      GM.currentAudio.pause();
+      GM.currentAudio = null;
+    }
+    if (GM.currentSourceCd) {
+      GM.currentSourceCd.style.opacity = '';
+      GM.currentSourceCd = null;
+    }
+    if (GM.flyingCd) {
+      GM.flyingCd.remove();
+      GM.flyingCd = null;
+    }
+    var playingBtns = document.querySelectorAll('.btn-preview.playing');
+    for(var i=0; i<playingBtns.length; i++) {
+      playingBtns[i].classList.remove('playing');
+      playingBtns[i].innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+    }
+  };
+
+  var vsCardsContainer = document.querySelector('.vs-cards');
+  if (vsCardsContainer) {
+    vsCardsContainer.addEventListener('click', function(e) {
+      var btn = e.target.closest('.btn-preview');
+      if (btn) {
+        e.stopPropagation(); 
+        var val = btn.getAttribute('data-val');
+        var suffix = btn.getAttribute('data-suffix');
+        
+        if (btn.classList.contains('playing')) {
+          GM.stopPreview();
+        } else {
+          GM.playPreview(val, suffix, btn);
+        }
+      }
+    });
+  }
+
+  GM.playPreview = function(value, suffix, btn) {
+    var url = GM.state.meta[value] && GM.state.meta[value].previewUrl;
+    if (!url) return;
+
+    GM.stopPreview(); 
+
+    GM.currentAudio = new Audio(url);
+    var playPromise = GM.currentAudio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(function(error) {
+        console.warn("Audio play prevented:", error);
+        GM.stopPreview();
+      });
+    }
+
+    btn.classList.add('playing');
+    btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>'; 
+    GM.currentAudio.onended = GM.stopPreview;
+
+    var sourceCd = document.querySelector('#vsCard' + suffix + ' .vs-card-cd-disc');
+    var playerBody = document.querySelector('.cd-player-wrapper .main-body');
+    var targetForScale = document.querySelector('.cd-player-wrapper .cd-positioner');
+    var boxEl = document.querySelector('.vs-box'); 
+    
+    if (!sourceCd || !playerBody || !boxEl) return;
+
+    GM.currentSourceCd = sourceCd;
+    var rectSrc = sourceCd.getBoundingClientRect();
+    var rectDst = playerBody.getBoundingClientRect(); 
+    var boxRect = boxEl.getBoundingClientRect(); 
+
+    var flying = sourceCd.cloneNode(true);
+    GM.flyingCd = flying;
+    
+    var startLeft = rectSrc.left - boxRect.left + boxEl.scrollLeft;
+    var startTop = rectSrc.top - boxRect.top + boxEl.scrollTop;
+
+    flying.style.position = 'absolute'; 
+    flying.style.left = startLeft + 'px';
+    flying.style.top = startTop + 'px';
+    flying.style.margin = '0';
+    flying.style.transform = 'none'; 
+    flying.style.zIndex = '15'; 
+    flying.style.transition = 'none';
+    boxEl.appendChild(flying); 
+
+    sourceCd.style.opacity = '0'; 
+
+    var centerLeft = window.innerWidth / 2 - boxRect.left - (rectSrc.width / 2) + boxEl.scrollLeft;
+    var centerTop = window.innerHeight / 2 - boxRect.top - (rectSrc.height / 2) + boxEl.scrollTop;
+    
+    var dstLeft = rectDst.left - boxRect.left + (rectDst.width / 2) - (rectSrc.width / 2) + boxEl.scrollLeft;
+    var dstTop = rectDst.top - boxRect.top + (rectDst.height / 2) - (rectSrc.height / 2) + boxEl.scrollTop;
+    var scaleTarget = targetForScale ? (targetForScale.getBoundingClientRect().width / rectSrc.width) : 0.5;
+
+    var deltaCenterX = centerLeft - startLeft;
+    var deltaCenterY = centerTop - startTop;
+    var deltaDstX = dstLeft - startLeft;
+    var deltaDstY = dstTop - startTop;
+
+    var keyframes = [
+      { transform: 'translate(0px, 0px) scale(1)' },
+      { transform: 'translate(' + deltaCenterX + 'px, ' + deltaCenterY + 'px) scale(1.2)', offset: 0.35 },
+      { transform: 'translate(' + deltaCenterX + 'px, ' + deltaCenterY + 'px) scale(1.2)', offset: 0.65 },
+      { transform: 'translate(' + deltaDstX + 'px, ' + deltaDstY + 'px) scale(' + scaleTarget + ')' }
+    ];
+
+    var anim = flying.animate(keyframes, {
+      duration: 1500,
+      easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+      fill: 'forwards'
+    });
+
+    anim.onfinish = function() {
+      flying.style.opacity = '0'; 
+    };
+  };
+
   /* ===== 对阵选择弹窗 ===== */
   var vsMask = document.getElementById("vsMask");
   var vsTitle = document.getElementById("vsTitle");
@@ -103,11 +219,13 @@ var GM = window.GM = window.GM || {};
   }
 
   function updateVsScreen() {
-    var screenEl = document.getElementById("vsPlayerScreen");
-    if (screenEl) {
+    var trackEl = document.getElementById("vsPlayerTrack");
+    var timerEl = document.getElementById("vsPlayerTimer");
+    if (trackEl && timerEl) {
       var matchNum = getMatchNumber(vsR, vsI);
       var total = GM.totalMatches();
-      screenEl.innerHTML = "TRACK " + matchNum + "/" + total + "&nbsp;&nbsp;&nbsp;" + formatTime(vsTimerSeconds);
+      trackEl.textContent = matchNum + "/" + total;
+      timerEl.textContent = formatTime(vsTimerSeconds);
     }
   }
 
@@ -131,6 +249,7 @@ var GM = window.GM = window.GM || {};
   function closePopup() {
     vsMask.classList.remove("show");
     stopVsTimer();
+    GM.stopPreview(); 
   }
 
   function findNextMatch(fromR, fromI) {
@@ -184,7 +303,14 @@ var GM = window.GM = window.GM || {};
         coverEl.innerHTML = '<span class="emoji">🎵</span>';
       } else {
         var hdUrl = GM.state.meta[value].artworkUrl100.replace('100x100bb', '400x400bb');
-        coverEl.innerHTML = '<img src="' + hdUrl + '" alt="cover" onerror="this.parentElement.innerHTML=\'<span class=\\\'emoji\\\'>🎵</span>\';">';
+        var html = '<img src="' + hdUrl + '" alt="cover" onerror="this.parentElement.innerHTML=\'<span class=\\\'emoji\\\'>🎵</span>\';">';
+        
+        if (GM.state.meta[value].previewUrl) {
+          html += '<div class="btn-preview" data-val="' + GM.esc(value) + '" data-suffix="' + suffix + '" title="试听片段">' +
+                  '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>' +
+                  '</div>';
+        }
+        coverEl.innerHTML = html;
       }
     }
     setCard('A', src[0]);
@@ -212,6 +338,8 @@ var GM = window.GM = window.GM || {};
     if (GM.state.winners[vsR][vsI] !== null) return;
     isPicking = true;
     cardEl.classList.add("picked");
+    
+    GM.stopPreview(); 
 
     setTimeout(function () {
       GM.state.winners[vsR][vsI] = value;
@@ -252,14 +380,22 @@ var GM = window.GM = window.GM || {};
     }, 300);
   }
 
-  document.getElementById("vsCardA").addEventListener("click", function () { pickWinner(GM.getSources(vsR, vsI)[0], document.getElementById("vsCardA")); });
-  document.getElementById("vsCardB").addEventListener("click", function () { pickWinner(GM.getSources(vsR, vsI)[1], document.getElementById("vsCardB")); });
+  document.getElementById("vsCardA").addEventListener("click", function (e) { 
+    if(e.target.closest('.btn-preview')) return; 
+    pickWinner(GM.getSources(vsR, vsI)[0], document.getElementById("vsCardA")); 
+  });
+  document.getElementById("vsCardB").addEventListener("click", function (e) { 
+    if(e.target.closest('.btn-preview')) return; 
+    pickWinner(GM.getSources(vsR, vsI)[1], document.getElementById("vsCardB")); 
+  });
+
   vsClear.addEventListener("click", function () {
     if (GM.state.winners[vsR][vsI] === null) return;
     GM.clearNode(vsR, vsI);
     GM.save(); GM.render();
     renderVsCards();
     updateVsProgress();
+    GM.stopPreview(); 
   });
   document.getElementById("vsClose").addEventListener("click", closePopup);
   vsMask.addEventListener("click", function (e) { if (e.target === vsMask) closePopup(); });
@@ -307,7 +443,32 @@ var GM = window.GM = window.GM || {};
       if (semis[i] && semis[i] !== final_0 && semis[i] !== final_1) top4.push(semis[i]);
     }
 
-    document.getElementById("resChampName").textContent = champ;
+    var champNameEl = document.getElementById("resChampName");
+    champNameEl.textContent = champ;
+
+    // 冠军封面：仅导入歌曲（有 API 封面）时展示；手动录入或封面加载失败时保持原有展示
+    var coverBox = document.getElementById("resChampCoverBox");
+    var coverImg = document.getElementById("resChampCover");
+    var champIcon = document.getElementById("resChampIcon");
+    var champMeta = GM.state.meta[champ];
+    coverBox.style.display = "none";
+    champIcon.style.display = "";
+    champNameEl.classList.remove("with-cover");
+    coverImg.removeAttribute("src");
+    if (champMeta && champMeta.source !== "manual" && champMeta.artworkUrl100) {
+      coverImg.onload = function () {
+        coverBox.style.display = "inline-block";
+        champIcon.style.display = "none";
+        champNameEl.classList.add("with-cover");
+      };
+      coverImg.onerror = function () {
+        coverBox.style.display = "none";
+        champIcon.style.display = "";
+        champNameEl.classList.remove("with-cover");
+      };
+      coverImg.src = champMeta.artworkUrl100.replace("100x100bb", "400x400bb");
+    }
+
     document.getElementById("resRunnerUp").textContent = runnerUp || "未知";
     document.getElementById("resTop4_1").textContent = top4[0] || "未知";
     document.getElementById("resTop4_2").textContent = top4[1] || "未知";
@@ -336,6 +497,102 @@ var GM = window.GM = window.GM || {};
     }
     document.getElementById("resRoadList").innerHTML = roadHtml;
     resMask.classList.add("show");
+    playConfetti();
+  }
+
+  /* ===== 冠军彩带喷发动画：两侧下方向上方中间喷发，自然落下消失 ===== */
+  function playConfetti() {
+    var old = document.getElementById("confettiCanvas");
+    if (old) old.parentNode.removeChild(old);
+
+    var canvas = document.createElement("canvas");
+    canvas.id = "confettiCanvas";
+    canvas.className = "confetti-canvas";
+    document.body.appendChild(canvas);
+
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var W = window.innerWidth, H = window.innerHeight;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    var ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+
+    var COLORS = ["#F0AC4A", "#c498ff", "#ffd93d", "#ff6b9d", "#5bd8ff", "#7ee787", "#ffffff"];
+    var GRAV = 1500;      // 重力加速度 px/s^2
+    var EMIT_MS = 100;    // 喷发时长（极短爆发）
+    var MAX_MS = 3000;    // 动画总时长上限
+    var particles = [];
+    var start = performance.now();
+    var prev = start;
+
+    function emit(side) {
+      var fromLeft = (side === "left");
+      for (var k = 0; k < 18; k++) {
+        // 竖直初速：可上升至屏幕上中部区域
+        var vy = -(0.85 + Math.random() * 0.5) * Math.sqrt(2 * GRAV * H * 0.7);
+        // 水平初速：按到达顶点时间推算，使彩带向屏幕中轴汇聚
+        var tPeak = -vy / GRAV;
+        var vx = (W * 0.5 * (0.45 + Math.random() * 0.55)) / tPeak;
+        particles.push({
+          x: fromLeft ? -8 : W + 8,
+          y: H * (0.98 + (Math.random() - 0.5) * 0.3),
+          vx: fromLeft ? vx : -vx,
+          vy: vy,
+          w: 5 + Math.random() * 5,
+          h: 8 + Math.random() * 7,
+          circle: Math.random() < 0.25,
+          color: COLORS[(Math.random() * COLORS.length) | 0],
+          angle: Math.random() * Math.PI,
+          vAngle: (Math.random() - 0.5) * 14,
+          sway: 20 + Math.random() * 45,
+          phase: Math.random() * 1000,
+          age: 0,
+          ttl: 2200 + Math.random() * 700
+        });
+      }
+    }
+
+    function frame(now) {
+      var elapsed = now - start;
+      var dt = Math.min((now - prev) / 1000, 0.05);
+      prev = now;
+
+      if (elapsed < EMIT_MS) { emit("left"); emit("right"); }
+
+      ctx.clearRect(0, 0, W, H);
+      var alive = false;
+      for (var i = 0; i < particles.length; i++) {
+        var p = particles[i];
+        p.age += dt * 1000;
+        if (p.age >= p.ttl || p.y > H + 40) continue;
+        alive = true;
+        p.vy += GRAV * dt;
+        p.vx *= (1 - 0.15 * dt);
+        p.x += (p.vx + Math.sin((p.age + p.phase) * 0.012) * p.sway) * dt;
+        p.y += p.vy * dt;
+        p.angle += p.vAngle * dt;
+        ctx.save();
+        ctx.globalAlpha = p.age > p.ttl - 500 ? Math.max(0, (p.ttl - p.age) / 500) : 1;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.angle);
+        ctx.fillStyle = p.color;
+        if (p.circle) {
+          ctx.beginPath();
+          ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        }
+        ctx.restore();
+      }
+
+      if (elapsed < MAX_MS && (elapsed < EMIT_MS || alive)) {
+        requestAnimationFrame(frame);
+      } else if (canvas.parentNode) {
+        canvas.parentNode.removeChild(canvas);
+      }
+    }
+    requestAnimationFrame(frame);
   }
 
   /* ===== 全局事件 ===== */
@@ -410,7 +667,6 @@ var GM = window.GM = window.GM || {};
     GM.state.avgColor = null;
     GM.state.allFetchedSongs = [];
     
-    // 取消分享态并重置界面显示
     window._isSharedLink = false;
     
     GM.clearAllWinners();
@@ -585,7 +841,11 @@ var GM = window.GM = window.GM || {};
     for (var j = 0; j < currentInputs.length; j++) {
       var song = currentInputs[j];
       if (song && GM.state.meta[song] && GM.state.meta[song].source !== 'manual' && GM.state.meta[song].artworkUrl100) {
-        shareMeta[song] = GM.state.meta[song].artworkUrl100;
+        // 【核心修复 1】：分享时把试听链接(previewUrl)一起打包进去
+        shareMeta[song] = {
+            a: GM.state.meta[song].artworkUrl100,
+            p: GM.state.meta[song].previewUrl || ""
+        };
       }
     }
     
@@ -899,10 +1159,23 @@ var GM = window.GM = window.GM || {};
     if (topMoreMask) topMoreMask.classList.remove("show");
   }
 
-  // 绑定新的“…”菜单弹窗
   var btnViewToggle = document.getElementById("btnViewToggle");
   if (btnViewToggle) {
     btnViewToggle.addEventListener("click", function () {
+      var menuItemChangeCover = document.getElementById("menuItemChangeCover");
+      if (menuItemChangeCover) {
+        var hasApiCovers = false;
+        var currentInputs = GM.state.inputs || [];
+        for (var i = 0; i < currentInputs.length; i++) {
+          var song = currentInputs[i];
+          if (song && GM.state.meta[song] && GM.state.meta[song].source === 'api' && GM.state.meta[song].artworkUrl100) {
+            hasApiCovers = true;
+            break;
+          }
+        }
+        menuItemChangeCover.style.display = hasApiCovers ? "flex" : "none";
+      }
+
       if (topMoreMenu) topMoreMenu.classList.add("show");
       if (topMoreMask) topMoreMask.classList.add("show");
     });
@@ -915,7 +1188,7 @@ var GM = window.GM = window.GM || {};
     menuItemList.addEventListener("click", function() {
       closeTopMenu();
       GM.switchTab(true);
-      GM.render(); // 确保切回后状态一致
+      GM.render(); 
     });
   }
 
@@ -933,6 +1206,46 @@ var GM = window.GM = window.GM || {};
     menuItemShare.addEventListener("click", function() {
       closeTopMenu();
       if (typeof handleShare === "function") handleShare();
+    });
+  }
+
+  var menuItemChangeCover = document.getElementById("menuItemChangeCover");
+  if (menuItemChangeCover) {
+    menuItemChangeCover.addEventListener("click", function() {
+      closeTopMenu();
+      
+      var validCovers = [];
+      var currentInputs = GM.state.inputs || [];
+      for (var i = 0; i < currentInputs.length; i++) {
+        var song = currentInputs[i];
+        if (song && GM.state.meta[song] && GM.state.meta[song].source === 'api' && GM.state.meta[song].artworkUrl100) {
+          var url = GM.state.meta[song].artworkUrl100.replace('100x100bb', '600x600bb');
+          if (validCovers.indexOf(url) === -1) {
+            validCovers.push(url);
+          }
+        }
+      }
+
+      if (validCovers.length === 0) {
+        GM.toast("当前没有可用的歌曲封面");
+        return;
+      }
+
+      for (var k = validCovers.length - 1; k > 0; k--) {
+        var j = Math.floor(Math.random() * (k + 1));
+        var tmp = validCovers[k];
+        validCovers[k] = validCovers[j];
+        validCovers[j] = tmp;
+      }
+
+      GM.state.covers = validCovers.slice(0, 3);
+      GM.state.avgColor = null;
+      GM.save();
+      
+      if (typeof GM.renderHeaderCovers === "function") {
+        GM.renderHeaderCovers();
+      }
+      GM.toast("已更换封面与主题色");
     });
   }
 
@@ -1002,7 +1315,6 @@ var GM = window.GM = window.GM || {};
   document.getElementById("sizeSelect").addEventListener("change", function (e) { handleSizeChange(+e.target.value); });
   document.getElementById("qsSizeSelect").addEventListener("change", function (e) { handleSizeChange(+e.target.value); });
 
-  /* ===== 提取的通用渲染启动 ===== */
   function initApp() {
     GM.buildTable();
     syncSizeSeg();
@@ -1010,7 +1322,6 @@ var GM = window.GM = window.GM || {};
     GM.render();
   }
 
-  /* ===== 启动与路由解析 ===== */
   try {
     for (var lk = 0; lk < GM.LS_KEY_LEGACY.length; lk++) {
       if (localStorage.getItem(GM.LS_KEY_LEGACY[lk]) !== null) localStorage.removeItem(GM.LS_KEY_LEGACY[lk]);
@@ -1020,9 +1331,8 @@ var GM = window.GM = window.GM || {};
   GM.load();
   if (!GM.SIZE_CONFIG[GM.state.size]) GM.state.size = 64;
 
-  // KV Functions 代理分享链接解析逻辑
   var params = new URLSearchParams(window.location.search);
-  var shareId = params.get("id"); // 从 URL 提取短码参数 id
+  var shareId = params.get("id"); 
 
   if (shareId) {
     GM.toast("正在加载好友分享的对阵列表...", 60000);
@@ -1037,34 +1347,39 @@ var GM = window.GM = window.GM || {};
            GM.state.title = parsedData.t || "好友分享的金曲世界杯";
            GM.state.inputs = parsedData.i;
            
-           // 还原封面，并清空自选缓存
            GM.state.covers = parsedData.c || [];
            GM.state.avgColor = null; 
            GM.state.allFetchedSongs = []; 
            GM.state.winners = GM.makeWinners(GM.state.size);
            
-           // 还原对阵弹窗的局部封面
+           // 【核心修复 2】：解析时也要兼容读取试听链接
            GM.state.meta = {};
            if (parsedData.m) {
              for (var songKey in parsedData.m) {
-               GM.state.meta[songKey] = {
-                 artworkUrl100: parsedData.m[songKey],
-                 source: 'api'
-               };
+               var mData = parsedData.m[songKey];
+               if (typeof mData === 'string') {
+                 // 兼容旧版纯封面分享链接
+                 GM.state.meta[songKey] = {
+                   artworkUrl100: mData,
+                   source: 'api'
+                 };
+               } else {
+                 // 新版本：包含图片与试听链接
+                 GM.state.meta[songKey] = {
+                   artworkUrl100: mData.a || "",
+                   previewUrl: mData.p || "",
+                   source: 'api'
+                 };
+               }
              }
            }
            
            document.getElementById("titleInput").value = GM.state.title;
-           
-           // 设置处于被分享状态，阻断右上角“…”菜单
            window._isSharedLink = true;
-
-           // 擦除 URL 上的短码，保持网页清爽
            window.history.replaceState({}, document.title, window.location.pathname);
            
-           // 确保拉取到的分享数据落入本地缓存，防止刷新丢失
+           // 解析完成后，这个覆盖了的 meta 会被保存到本地缓存
            GM.save(); 
-
            initApp();
            GM.toast("已加载好友分享的对阵列表！", 2500);
         } else {
@@ -1075,10 +1390,9 @@ var GM = window.GM = window.GM || {};
         console.error("解析分享链接失败:", e);
         GM.toast("分享链接已失效或短码错误", 2500);
         window._isSharedLink = false;
-        initApp(); // 如果加载失败也需保证正常启动渲染
+        initApp(); 
       });
   } else {
-    // 正常启动
     initApp();
   }
 

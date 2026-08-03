@@ -87,6 +87,9 @@ GM.applyColors = function (rgb) {
   root.style.setProperty('--theme-primary-shadow', 'rgba(' + sLight + ', 0.4)');
   root.style.setProperty('--theme-btn-secondary', 'rgba(' + sRGB + ', 0.4)');
   root.style.setProperty('--theme-btn-secondary-hover', 'rgba(' + sRGB + ', 0.55)');
+  
+  // 新增：为卡片选中背景生成具有 16% 透明度的主题色
+  root.style.setProperty('--theme-picked-bg', 'rgba(' + sLight + ', 0.16)');
 };
 
 /* ===== 重置主题色 ===== */
@@ -103,6 +106,7 @@ GM.resetColors = function () {
   root.style.removeProperty('--theme-primary-shadow');
   root.style.removeProperty('--theme-btn-secondary');
   root.style.removeProperty('--theme-btn-secondary-hover');
+  root.style.removeProperty('--theme-picked-bg');
   GM.state.avgColor = null;
 };
 

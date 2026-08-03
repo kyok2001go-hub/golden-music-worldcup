@@ -83,11 +83,12 @@ GM.buildExportSvg = function () {
   var GRAY = "rgba(255,255,255,.35)", BLACK = "#f0f1f8", PURPLE = "#c498ff", GOLD = "#F0AC4A";
 
   var N = GM.seeds(), R = GM.rounds(), last = GM.lastR();
+  var compact = (N === 64); // 64 位选手时启用紧凑布局：第一列尺寸缩放至 60%
   var padX = 14, padTop = 14, padBottom = 20;
   var titleH = 76;
-  var headH = 34, rowH = 36;
+  var headH = 34, rowH = compact ? 22 : 36;
   var footerH = 100;
-  var colW = [170];
+  var colW = [compact ? 102 : 170];
   for (var cw = 0; cw < R; cw++) colW.push(cw === last ? 140 : 118);
 
   var heads = [N + "强"].concat(GM.SIZE_CONFIG[N].roundNames);
@@ -134,7 +135,7 @@ GM.buildExportSvg = function () {
 
   var colLeft = [], colRight = [], colMidY = [];
 
-  var seedCardH = rowH - 6;
+  var seedCardH = rowH - (compact ? 4 : 6);
   var seedX = tx(0) + 4, seedW = colW[0] - 8;
   var seedRight = seedX + seedW;
   var seedY = [];
@@ -175,15 +176,16 @@ GM.buildExportSvg = function () {
     }
   }
 
+  var seedFs = compact ? 7.5 : 12.5;
   for (var row = 0; row < N; row++) {
     var y = bodyTop + row * rowH + (rowH - seedCardH) / 2;
     s += '<rect x="' + seedX + '" y="' + y + '" width="' + seedW + '" height="' + seedCardH +
       '" rx="4" fill="#ffffff" fill-opacity="0.08" stroke="' + CARD + '"/>';
     var iv = GM.state.inputs[row] || "";
     if (iv) {
-      var ivLine = GM.wrapText(iv, 12.5, seedW - 12, 1);
-      s += '<text x="' + (seedX + seedW / 2) + '" y="' + vcenter(bodyTop + row * rowH + rowH / 2, 12.5) +
-        '" font-size="12.5" fill="' + BLACK + '" text-anchor="middle">' + GM.esc(ivLine[0]) + "</text>";
+      var ivLine = GM.wrapText(iv, seedFs, seedW - 12, 1);
+      s += '<text x="' + (seedX + seedW / 2) + '" y="' + vcenter(bodyTop + row * rowH + rowH / 2, seedFs) +
+        '" font-size="' + seedFs + '" fill="' + BLACK + '" text-anchor="middle">' + GM.esc(ivLine[0]) + "</text>";
     }
   }
 

@@ -102,9 +102,9 @@ GM.handleSongs = function (name, data) {
       collectionName: it.collectionName || "",
       releaseDate: it.releaseDate || "",
       artworkUrl100: it.artworkUrl100 || "",
+      previewUrl: it.previewUrl || "", // 【核心修改】：添加试听链接缓存
       source: 'api'
     };
-    // V2.3: 去掉截断逻辑，最大化收集200首歌曲，以便后续「自选」
   }
   return { songs: songs, metaData: metaData };
 };
@@ -161,16 +161,22 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
 };
 
 GM.extractCoversFromApiRes = function (res) {
-  var newCovers = [];
+  var allCovers = [];
   for (var i = 0; i < res.songs.length; i++) {
     var s = res.songs[i];
     if (res.metaData[s] && res.metaData[s].artworkUrl100) {
       var url = res.metaData[s].artworkUrl100.replace('100x100bb', '600x600bb');
-      if (newCovers.indexOf(url) === -1) {
-        newCovers.push(url);
+      if (allCovers.indexOf(url) === -1) {
+        allCovers.push(url);
       }
     }
-    if (newCovers.length >= 8) break;
   }
-  return newCovers;
+
+  for (var k = allCovers.length - 1; k > 0; k--) {
+    var j = Math.floor(Math.random() * (k + 1));
+    var tmp = allCovers[k];
+    allCovers[k] = allCovers[j];
+    allCovers[j] = tmp;
+  }
+  return allCovers.slice(0, 8);
 };
