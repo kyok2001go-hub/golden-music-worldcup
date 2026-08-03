@@ -80,12 +80,18 @@ GM.fetchQRBase64 = function (text, cb) {
 GM._imgCache = {};
 GM.fetchImageBase64 = function (url, cb) {
   if (GM._imgCache[url]) return cb(GM._imgCache[url]);
+  
   function toBase64(blob) {
     var reader = new FileReader();
     reader.onloadend = function () { GM._imgCache[url] = reader.result; cb(GM._imgCache[url]); };
     reader.readAsDataURL(blob);
   }
-  fetch(url).then(function (res) {
+
+  // 【核心修复】：追加时间戳，强制绕过 iOS Safari / 微信浏览器的非 CORS 磁盘缓存
+  // 欺骗浏览器这是一张新图片，从而强制发起带 CORS 权限的新网络请求
+  var fetchUrl = url + (url.indexOf("?") > -1 ? "&" : "?") + "_t=" + Date.now();
+
+  fetch(fetchUrl).then(function (res) {
     if (!res.ok) throw new Error();
     return res.blob();
   }).then(toBase64).catch(function () {
