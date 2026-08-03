@@ -519,7 +519,7 @@ var GM = window.GM = window.GM || {};
 
     var COLORS = ["#F0AC4A", "#c498ff", "#ffd93d", "#ff6b9d", "#5bd8ff", "#7ee787", "#ffffff"];
     var GRAV = 1500;      // 重力加速度 px/s^2
-    var EMIT_MS = 100;    // 喷发时长（极短爆发）
+    var EMIT_MS = 50;     // 喷发时长（极短爆发）
     var MAX_MS = 3000;    // 动画总时长上限
     var particles = [];
     var start = performance.now();
@@ -527,12 +527,12 @@ var GM = window.GM = window.GM || {};
 
     function emit(side) {
       var fromLeft = (side === "left");
-      for (var k = 0; k < 18; k++) {
+      for (var k = 0; k < 36; k++) {
         // 竖直初速：可上升至屏幕上中部区域
         var vy = -(0.85 + Math.random() * 0.5) * Math.sqrt(2 * GRAV * H * 0.7);
         // 水平初速：按到达顶点时间推算，使彩带向屏幕中轴汇聚
         var tPeak = -vy / GRAV;
-        var vx = (W * 0.5 * (0.45 + Math.random() * 0.55)) / tPeak;
+        var vx = (W * 0.7 * (0.45 + Math.random() * 0.55)) / tPeak; // 水平散开参数手动调整为0.7
         particles.push({
           x: fromLeft ? -8 : W + 8,
           y: H * (0.98 + (Math.random() - 0.5) * 0.3),

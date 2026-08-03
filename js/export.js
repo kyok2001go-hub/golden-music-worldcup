@@ -76,8 +76,28 @@ GM.fetchQRBase64 = function (text, cb) {
   });
 };
 
+/* ===== 获取图片 Base64（用于导出图嵌入冠军封面） ===== */
+GM._imgCache = {};
+GM.fetchImageBase64 = function (url, cb) {
+  if (GM._imgCache[url]) return cb(GM._imgCache[url]);
+  function toBase64(blob) {
+    var reader = new FileReader();
+    reader.onloadend = function () { GM._imgCache[url] = reader.result; cb(GM._imgCache[url]); };
+    reader.readAsDataURL(blob);
+  }
+  fetch(url).then(function (res) {
+    if (!res.ok) throw new Error();
+    return res.blob();
+  }).then(toBase64).catch(function () {
+    fetch(GM.CORS_PROXY + encodeURIComponent(url)).then(function (res) {
+      if (!res.ok) throw new Error();
+      return res.blob();
+    }).then(toBase64).catch(function () { cb(null); });
+  });
+};
+
 /* ===== 构建 SVG 对阵图 ===== */
-GM.buildExportSvg = function () {
+GM.buildExportSvg = function (champCover) {
   var title = GM.state.title || "金曲世界杯";
   var FONT = "Microsoft YaHei, PingFang SC, sans-serif";
   var GRAY = "rgba(255,255,255,.35)", BLACK = "#f0f1f8", PURPLE = "#c498ff", GOLD = "#F0AC4A";
@@ -109,7 +129,10 @@ GM.buildExportSvg = function () {
     '<stop offset="0" stop-color="#130b20"/>' +
     '<stop offset="0.42" stop-color="#1a1033"/>' +
     '<stop offset="1" stop-color="#0f0a1c"/>' +
-    '</linearGradient></defs>';
+    '</linearGradient>' +
+    '<filter id="crownShadow" x="-50%" y="-50%" width="200%" height="200%">' +
+    '<feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>' +
+    '</filter></defs>';
   s += '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="url(#bgGrad)"/>';
 
   s += '<rect x="' + padX + '" y="' + padTop + '" width="' + tableW + '" height="' + titleH +
@@ -203,17 +226,47 @@ GM.buildExportSvg = function () {
       var cardX = tx(r + 1) + GAPX, cardW = colW[r + 1] - GAPX * 2;
       var cardY = cy + ch / 2 - cardH / 2;
       var strokeC = CARD;
-      s += '<rect x="' + cardX + '" y="' + cardY + '" width="' + cardW + '" height="' + cardH +
-        '" rx="4" fill="#ffffff" fill-opacity="0.08" stroke="' + strokeC + '"/>';
       var v = GM.state.winners[r][i];
       var midY = cy + ch / 2;
+      var coverMode = (r === last) && !!champCover && !!v;
+      if (!coverMode) {
+        s += '<rect x="' + cardX + '" y="' + cardY + '" width="' + cardW + '" height="' + cardH +
+          '" rx="4" fill="#ffffff" fill-opacity="0.08" stroke="' + strokeC + '"/>';
+      }
       if (v) {
         var color = GM.cellColor(r, i);
         var fw = (r === last) ? 800 : (color === PURPLE ? 700 : 600);
         var maxW = cardW - 12;
         var lineH = fs * 1.3;
         var cx = cardX + cardW / 2;
-        if (r === last) {
+        if (coverMode) {
+          // 冠军封面版：封面 + 倾斜金冠 + 金色歌名（无卡片背景与边框）
+          var coverSize = 84;
+          var coverX = cx - coverSize / 2;
+          var nameFs = 18;
+          var cNames = GM.wrapText(v, nameFs, colW[r + 1] - 8, 2);
+          var cLineH = nameFs * 1.3;
+          var gapCN = 12;
+          var coverY = midY - (coverSize + gapCN + cNames.length * cLineH) / 2;
+          s += '<clipPath id="champCoverClip"><rect x="' + coverX + '" y="' + coverY +
+            '" width="' + coverSize + '" height="' + coverSize + '" rx="10"/></clipPath>';
+          s += '<image href="' + champCover + '" x="' + coverX + '" y="' + coverY +
+            '" width="' + coverSize + '" height="' + coverSize +
+            '" preserveAspectRatio="xMidYMid slice" clip-path="url(#champCoverClip)"/>';
+          s += '<rect x="' + coverX + '" y="' + coverY + '" width="' + coverSize +
+            '" height="' + coverSize + '" rx="10" fill="none" stroke="rgba(240,172,74,.5)" stroke-width="1.5"/>';
+          var crownSize = 24;
+          var crownX = coverX + coverSize - crownSize + 9;
+          var crownY = coverY - 9;
+          s += '<g transform="translate(' + crownX + ',' + crownY + ') rotate(30 ' + crownSize / 2 + ' ' + crownSize / 2 +
+            ')" filter="url(#crownShadow)"><path fill="#F0AC4A" transform="scale(' + crownSize / 24 +
+            ')" d="M12 3l3.2 5.2L21 6l-1.6 9H4.6L3 6l5.8 2.2L12 3zM4.5 17h15v2h-15z"/></g>';
+          for (var ln3 = 0; ln3 < cNames.length; ln3++) {
+            s += '<text x="' + cx + '" y="' + (coverY + coverSize + gapCN + nameFs * 0.82 + ln3 * cLineH) +
+              '" font-size="' + nameFs + '" font-weight="800" fill="' + GOLD +
+              '" text-anchor="middle">' + GM.esc(cNames[ln3]) + "</text>";
+          }
+        } else if (r === last) {
           var nameArr = GM.wrapText(v, fs, maxW, 3);
           var totalH = 26 * 1.1 + nameArr.length * lineH;
           var iconY = midY - totalH / 2 + 26 * 0.82;
@@ -260,48 +313,58 @@ GM.buildExportSvg = function () {
 /* ===== 渲染到 Canvas ===== */
 GM.renderToCanvas = function (cb) {
   GM.fetchQRBase64("https://goldensong-worldcup.pages.dev/", function (qrBase64) {
-    var SCALE = 2;
-    var out = GM.buildExportSvg();
-    var svgBlob = new Blob([out.svg], { type: "image/svg+xml;charset=utf-8" });
-    var svgUrl = URL.createObjectURL(svgBlob);
+    // 冠军封面：仅导入歌曲（有 API 封面）时嵌入导出图；手动录入或获取失败时按原逻辑生成
+    var champ = GM.state.winners[GM.lastR()] && GM.state.winners[GM.lastR()][0];
+    var champMeta = champ ? GM.state.meta[champ] : null;
+    var coverUrl = (champMeta && champMeta.source !== "manual" && champMeta.artworkUrl100)
+      ? champMeta.artworkUrl100.replace("100x100bb", "400x400bb") : null;
+    if (!coverUrl) { doRender(null); return; }
+    GM.fetchImageBase64(coverUrl, doRender);
 
-    var img = new Image();
-    img.onload = function () {
-      try {
-        var canvas = document.createElement("canvas");
-        canvas.width = out.w * SCALE;
-        canvas.height = out.h * SCALE;
-        var ctx = canvas.getContext("2d");
-        ctx.fillStyle = "#130b20";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    function doRender(champCover) {
+      var SCALE = 2;
+      var out = GM.buildExportSvg(champCover);
+      var svgBlob = new Blob([out.svg], { type: "image/svg+xml;charset=utf-8" });
+      var svgUrl = URL.createObjectURL(svgBlob);
 
-        ctx.scale(SCALE, SCALE);
-        ctx.drawImage(img, 0, 0);
-        URL.revokeObjectURL(svgUrl);
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var canvas = document.createElement("canvas");
+          canvas.width = out.w * SCALE;
+          canvas.height = out.h * SCALE;
+          var ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#130b20";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        if (qrBase64) {
-          var qrImg = new Image();
-          qrImg.onload = function () {
-            ctx.drawImage(qrImg, out.qrX, out.qrY, out.qrSize, out.qrSize);
+          ctx.scale(SCALE, SCALE);
+          ctx.drawImage(img, 0, 0);
+          URL.revokeObjectURL(svgUrl);
+
+          if (qrBase64) {
+            var qrImg = new Image();
+            qrImg.onload = function () {
+              ctx.drawImage(qrImg, out.qrX, out.qrY, out.qrSize, out.qrSize);
+              cb(null, canvas);
+            };
+            qrImg.onerror = function () {
+              cb(null, canvas);
+            };
+            qrImg.src = qrBase64;
+          } else {
             cb(null, canvas);
-          };
-          qrImg.onerror = function () {
-            cb(null, canvas);
-          };
-          qrImg.src = qrBase64;
-        } else {
-          cb(null, canvas);
+          }
+        } catch (e) {
+          URL.revokeObjectURL(svgUrl);
+          cb(e);
         }
-      } catch (e) {
+      };
+      img.onerror = function () {
         URL.revokeObjectURL(svgUrl);
-        cb(e);
-      }
-    };
-    img.onerror = function () {
-      URL.revokeObjectURL(svgUrl);
-      cb(new Error("图片渲染失败"));
-    };
-    img.src = svgUrl;
+        cb(new Error("图片渲染失败"));
+      };
+      img.src = svgUrl;
+    }
   });
 };
 
