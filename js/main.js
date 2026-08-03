@@ -510,7 +510,7 @@ var GM = window.GM = window.GM || {};
     canvas.className = "confetti-canvas";
     document.body.appendChild(canvas);
 
-    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     var W = window.innerWidth, H = window.innerHeight;
     canvas.width = W * dpr;
     canvas.height = H * dpr;
@@ -527,7 +527,7 @@ var GM = window.GM = window.GM || {};
 
     function emit(side) {
       var fromLeft = (side === "left");
-      for (var k = 0; k < 36; k++) {
+      for (var k = 0; k < 24; k++) {
         // 竖直初速：可上升至屏幕上中部区域
         var vy = -(0.85 + Math.random() * 0.5) * Math.sqrt(2 * GRAV * H * 0.7);
         // 水平初速：按到达顶点时间推算，使彩带向屏幕中轴汇聚
