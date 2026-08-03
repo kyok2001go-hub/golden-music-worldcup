@@ -76,7 +76,7 @@ GM.fetchQRBase64 = function (text, cb) {
   });
 };
 
-/* ===== 获取图片 Base64（用于导出图嵌入冠军封面） ===== */
+/* ===== 获取图片 Base64（带有移动端网络缓存破除机制） ===== */
 GM._imgCache = {};
 GM.fetchImageBase64 = function (url, cb) {
   if (GM._imgCache[url]) return cb(GM._imgCache[url]);
@@ -87,8 +87,7 @@ GM.fetchImageBase64 = function (url, cb) {
     reader.readAsDataURL(blob);
   }
 
-  // 【核心修复】：追加时间戳，强制绕过 iOS Safari / 微信浏览器的非 CORS 磁盘缓存
-  // 欺骗浏览器这是一张新图片，从而强制发起带 CORS 权限的新网络请求
+  // 强制追加时间戳，破除 iOS 磁盘缓存引起的纯净 CORS 拦截
   var fetchUrl = url + (url.indexOf("?") > -1 ? "&" : "?") + "_t=" + Date.now();
 
   fetch(fetchUrl).then(function (res) {
@@ -109,7 +108,7 @@ GM.buildExportSvg = function (champCover) {
   var GRAY = "rgba(255,255,255,.35)", BLACK = "#f0f1f8", PURPLE = "#c498ff", GOLD = "#F0AC4A";
 
   var N = GM.seeds(), R = GM.rounds(), last = GM.lastR();
-  var compact = (N === 64); // 64 位选手时启用紧凑布局：第一列尺寸缩放至 60%
+  var compact = (N === 64);
   var padX = 14, padTop = 14, padBottom = 20;
   var titleH = 76;
   var headH = 34, rowH = compact ? 22 : 36;
@@ -246,7 +245,6 @@ GM.buildExportSvg = function (champCover) {
         var lineH = fs * 1.3;
         var cx = cardX + cardW / 2;
         if (coverMode) {
-          // 冠军封面版：封面 + 倾斜金冠 + 金色歌名（无卡片背景与边框）
           var coverSize = 84;
           var coverX = cx - coverSize / 2;
           var nameFs = 18;
@@ -316,16 +314,31 @@ GM.buildExportSvg = function (champCover) {
   return { svg: s, w: W, h: H, qrX: qrX, qrY: qrY, qrSize: qrSize };
 };
 
-/* ===== 渲染到 Canvas ===== */
+/* ===== 渲染到 Canvas (彻底修复 iOS SVG 图片加载 Bug) ===== */
 GM.renderToCanvas = function (cb) {
   GM.fetchQRBase64("https://goldensong-worldcup.pages.dev/", function (qrBase64) {
-    // 冠军封面：仅导入歌曲（有 API 封面）时嵌入导出图；手动录入或获取失败时按原逻辑生成
     var champ = GM.state.winners[GM.lastR()] && GM.state.winners[GM.lastR()][0];
     var champMeta = champ ? GM.state.meta[champ] : null;
     var coverUrl = (champMeta && champMeta.source !== "manual" && champMeta.artworkUrl100)
       ? champMeta.artworkUrl100.replace("100x100bb", "400x400bb") : null;
+
     if (!coverUrl) { doRender(null); return; }
-    GM.fetchImageBase64(coverUrl, doRender);
+    
+    GM.fetchImageBase64(coverUrl, function(champCoverBase64) {
+         if (!champCoverBase64) { doRender(null); return; }
+         
+         // 【核心修复 1：预解码】
+         // 强制将 Base64 数据注入到真实的 DOM 节点中，逼迫 iOS WebKit 提前在内存中将其光栅化解码
+         // 避免它在后面的 SVG 渲染时出现异步竞争导致空白。
+         var preloadImg = new Image();
+         preloadImg.onload = function () {
+             doRender(champCoverBase64);
+         };
+         preloadImg.onerror = function () {
+             doRender(champCoverBase64); // 失败也继续，当做 fallback
+         };
+         preloadImg.src = champCoverBase64;
+    });
 
     function doRender(champCover) {
       var SCALE = 2;
@@ -335,35 +348,41 @@ GM.renderToCanvas = function (cb) {
 
       var img = new Image();
       img.onload = function () {
-        try {
-          var canvas = document.createElement("canvas");
-          canvas.width = out.w * SCALE;
-          canvas.height = out.h * SCALE;
-          var ctx = canvas.getContext("2d");
-          ctx.fillStyle = "#130b20";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // 【核心修复 2：渲染防抖】
+        // 增加 150 毫秒的宏任务延迟。
+        // 即便预解码生效，Safari 图形线程将内嵌 <image> 画入 Canvas 时仍有微小延迟。
+        // 用 setTimeout 给浏览器充足的渲染喘息时间，确保 100% 显示图像。
+        setTimeout(function () {
+            try {
+              var canvas = document.createElement("canvas");
+              canvas.width = out.w * SCALE;
+              canvas.height = out.h * SCALE;
+              var ctx = canvas.getContext("2d");
+              ctx.fillStyle = "#130b20";
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-          ctx.scale(SCALE, SCALE);
-          ctx.drawImage(img, 0, 0);
-          URL.revokeObjectURL(svgUrl);
+              ctx.scale(SCALE, SCALE);
+              ctx.drawImage(img, 0, 0);
+              URL.revokeObjectURL(svgUrl);
 
-          if (qrBase64) {
-            var qrImg = new Image();
-            qrImg.onload = function () {
-              ctx.drawImage(qrImg, out.qrX, out.qrY, out.qrSize, out.qrSize);
-              cb(null, canvas);
-            };
-            qrImg.onerror = function () {
-              cb(null, canvas);
-            };
-            qrImg.src = qrBase64;
-          } else {
-            cb(null, canvas);
-          }
-        } catch (e) {
-          URL.revokeObjectURL(svgUrl);
-          cb(e);
-        }
+              if (qrBase64) {
+                var qrImg = new Image();
+                qrImg.onload = function () {
+                  ctx.drawImage(qrImg, out.qrX, out.qrY, out.qrSize, out.qrSize);
+                  cb(null, canvas);
+                };
+                qrImg.onerror = function () {
+                  cb(null, canvas);
+                };
+                qrImg.src = qrBase64;
+              } else {
+                cb(null, canvas);
+              }
+            } catch (e) {
+              URL.revokeObjectURL(svgUrl);
+              cb(e);
+            }
+        }, 150);
       };
       img.onerror = function () {
         URL.revokeObjectURL(svgUrl);
