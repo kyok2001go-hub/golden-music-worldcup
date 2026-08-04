@@ -2,16 +2,28 @@ export async function onRequest(context) {
   // 1. 获取前端传过来的参数啊啊123
   const url = new URL(context.request.url);
   const term = url.searchParams.get('term');
+  const artistId = url.searchParams.get('artistId');
+  const entity = url.searchParams.get('entity');
 
-  if (!term) {
+  if (!term && !artistId) {
     return new Response(JSON.stringify({ error: "Missing term parameter" }), { 
       status: 400,
       headers: { "Content-Type": "application/json;charset=UTF-8" }
     });
   }
 
-  // 2. 拼接 iTunes 真实的请求地址 (带上 attribute=artistTerm 精准匹配歌手)
-  const targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=song&attribute=artistTerm&limit=200&country=CN&media=music`;
+  // 2. 拼接 iTunes 真实的请求地址
+  let targetUrl;
+  if (artistId) {
+    // 歌曲大乱斗：按 artistId 精确查询该歌手的歌曲（lookup 接口）
+    targetUrl = `https://itunes.apple.com/lookup?id=${encodeURIComponent(artistId)}&entity=song&limit=200&country=CN`;
+  } else if (entity === 'musicArtist') {
+    // 歌曲大乱斗：歌手候选搜索（entity=musicArtist 精确匹配歌手/艺术家）
+    targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=musicArtist&attribute=artistTerm&limit=10&country=CN`;
+  } else {
+    // 默认：带上 attribute=artistTerm 精准匹配歌手热歌
+    targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=song&attribute=artistTerm&limit=200&country=CN&media=music`;
+  }
 
   try {
     // 3. 核心：由 Cloudflare 代理请求苹果服务器，并伪装 User-Agent 为桌面端

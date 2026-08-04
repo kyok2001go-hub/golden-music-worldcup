@@ -209,7 +209,7 @@ GM.buildExportSvg = function (champCover) {
     var y = bodyTop + row * rowH + (rowH - seedCardH) / 2;
     s += '<rect x="' + seedX + '" y="' + y + '" width="' + seedW + '" height="' + seedCardH +
       '" rx="4" fill="#ffffff" fill-opacity="0.08" stroke="' + CARD + '"/>';
-    var iv = GM.state.inputs[row] || "";
+    var iv = GM.getDisplayName(GM.state.inputs[row] || "", false) || ""; // 导出图片仅显示歌曲名
     if (iv) {
       var ivLine = GM.wrapText(iv, seedFs, seedW - 12, 1);
       s += '<text x="' + (seedX + seedW / 2) + '" y="' + vcenter(bodyTop + row * rowH + rowH / 2, seedFs) +
@@ -225,13 +225,14 @@ GM.buildExportSvg = function (champCover) {
       var cy = bodyTop + i * span * rowH;
       var ch = span * rowH;
       var lineH0 = fs * 1.3;
-      var nameLines = GM.state.winners[r][i] ? GM.wrapText(GM.state.winners[r][i], fs, colW[r + 1] - GAPX * 2 - 12, 3).length : 1;
+      var nameLines = GM.state.winners[r][i] ? GM.wrapText(GM.getDisplayName(GM.state.winners[r][i], false), fs, colW[r + 1] - GAPX * 2 - 12, 3).length : 1;
       var estLines = nameLines + ((r === last && GM.state.winners[r][i]) ? 1.6 : 0);
       var cardH = Math.min(Math.max(34, estLines * lineH0 + 8), ch - 6);
       var cardX = tx(r + 1) + GAPX, cardW = colW[r + 1] - GAPX * 2;
       var cardY = cy + ch / 2 - cardH / 2;
       var strokeC = CARD;
       var v = GM.state.winners[r][i];
+      if (v) v = GM.getDisplayName(v, false); // 大乱斗 trackId 翻译为歌曲名（导出图不带歌手名）
       var midY = cy + ch / 2;
       var coverMode = (r === last) && !!champCover && !!v;
       if (!coverMode) {

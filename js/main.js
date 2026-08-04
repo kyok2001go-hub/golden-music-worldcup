@@ -19,25 +19,36 @@ var GM = window.GM = window.GM || {};
     }
   };
 
-  GM.switchTab = function (isQuick) {
-    GM.isQuickView = isQuick;
+  GM.switchTab = function (view) {
+    // 兼容旧布尔参数：true=quick，false=bracket；V3.0 新增 "brawl" 挑歌视图
+    if (view === true) view = "quick";
+    if (view === false) view = "bracket";
+    GM.isQuickView = (view === "quick");
     var viewQuickStart = document.getElementById("viewQuickStart");
     var viewBracket = document.getElementById("viewBracket");
+    var viewBrawlPick = document.getElementById("viewBrawlPick");
     var qsActionsWrap = document.getElementById("qsActionsWrap");
     var fabReview = document.getElementById("fabReview");
 
-    if (isQuick) {
+    if (viewBrawlPick) viewBrawlPick.classList.toggle("show", view === "brawl");
+
+    if (view === "quick") {
       if (viewQuickStart) viewQuickStart.style.display = "flex";
       if (viewBracket) viewBracket.style.display = "none";
       if (fabReview) fabReview.classList.remove("show");
       if (!GM.isInputsEmpty() && qsActionsWrap) {
         qsActionsWrap.style.display = "block";
       }
-    } else {
+    } else if (view === "bracket") {
       if (viewQuickStart) viewQuickStart.style.display = "none";
       if (viewBracket) viewBracket.style.display = "block";
       if (qsActionsWrap) qsActionsWrap.style.display = "none";
       GM.render();
+    } else if (view === "brawl") {
+      if (viewQuickStart) viewQuickStart.style.display = "none";
+      if (viewBracket) viewBracket.style.display = "none";
+      if (qsActionsWrap) qsActionsWrap.style.display = "none";
+      if (fabReview) fabReview.classList.remove("show");
     }
   };
 
@@ -296,8 +307,8 @@ var GM = window.GM = window.GM || {};
       var coverEl = document.getElementById("vsCover" + suffix);
 
       cardEl.className = "vs-card" + (disabled ? " disabled" : "") + ((value && value === cur) ? " picked" : "");
-      nameEl.textContent = empty ? "（暂无）" : value;
-      if (value) cardEl.title = value;
+      nameEl.textContent = empty ? "（暂无）" : GM.getDisplayName(value);
+      if (value) cardEl.title = GM.getDisplayName(value);
 
       if (empty || !GM.state.meta[value] || GM.state.meta[value].source === 'manual' || !GM.state.meta[value].artworkUrl100) {
         coverEl.innerHTML = '<span class="emoji">🎵</span>';
@@ -444,7 +455,7 @@ var GM = window.GM = window.GM || {};
     }
 
     var champNameEl = document.getElementById("resChampName");
-    champNameEl.textContent = champ;
+    champNameEl.textContent = GM.getDisplayName(champ);
 
     // 冠军封面：仅导入歌曲（有 API 封面）时展示；手动录入或封面加载失败时保持原有展示
     var coverBox = document.getElementById("resChampCoverBox");
@@ -469,9 +480,9 @@ var GM = window.GM = window.GM || {};
       coverImg.src = champMeta.artworkUrl100.replace("100x100bb", "400x400bb");
     }
 
-    document.getElementById("resRunnerUp").textContent = runnerUp || "未知";
-    document.getElementById("resTop4_1").textContent = top4[0] || "未知";
-    document.getElementById("resTop4_2").textContent = top4[1] || "未知";
+    document.getElementById("resRunnerUp").textContent = runnerUp ? GM.getDisplayName(runnerUp) : "未知";
+    document.getElementById("resTop4_1").textContent = top4[0] ? GM.getDisplayName(top4[0]) : "未知";
+    document.getElementById("resTop4_2").textContent = top4[1] ? GM.getDisplayName(top4[1]) : "未知";
 
     var roadHtml = "";
     var curChamp = champ;
@@ -492,7 +503,7 @@ var GM = window.GM = window.GM || {};
       roadHtml += '<div class="road-item">' +
         '<span class="road-r">' + GM.esc(roadData[j].rName) + '</span>' +
         '<span class="road-vs">vs</span>' +
-        '<span class="road-opp">' + GM.esc(roadData[j].opp || '（轮空）') + '</span>' +
+        '<span class="road-opp">' + GM.esc(roadData[j].opp ? GM.getDisplayName(roadData[j].opp) : '（轮空）') + '</span>' +
         '</div>';
     }
     document.getElementById("resRoadList").innerHTML = roadHtml;
@@ -666,12 +677,12 @@ var GM = window.GM = window.GM || {};
     GM.state.covers = [];
     GM.state.avgColor = null;
     GM.state.allFetchedSongs = [];
+    GM.state.brawl = GM.makeDefaultBrawl();
     
     window._isSharedLink = false;
     
     GM.clearAllWinners();
-    var inputs = GM.tbody.querySelectorAll("input[data-idx]");
-    for (var k = 0; k < inputs.length; k++) inputs[k].value = GM.state.inputs[k];
+    GM.syncSeedInputs();
     GM.save(); GM.render();
     closeBatchModal();
     GM.toast("已应用批量录入");
@@ -738,9 +749,9 @@ var GM = window.GM = window.GM || {};
       for (var k in res.metaData) GM.state.meta[k] = res.metaData[k];
 
       window._isSharedLink = false;
+      GM.state.brawl = GM.makeDefaultBrawl();
       GM.clearAllWinners();
-      var inputs = GM.tbody.querySelectorAll("input[data-idx]");
-      for (var q = 0; q < inputs.length; q++) inputs[q].value = GM.state.inputs[q];
+      GM.syncSeedInputs();
       GM.save(); GM.render();
       GM.toast("已生成对决列表，点击上方「自选歌曲」换歌", 2500);
     }, function (errMsg) {
@@ -770,9 +781,9 @@ var GM = window.GM = window.GM || {};
     GM.state.title = "金曲世界杯";
     document.getElementById("titleInput").value = GM.state.title;
     window._isSharedLink = false;
+    GM.state.brawl = GM.makeDefaultBrawl();
     GM.clearAllWinners();
-    var inputs = GM.tbody.querySelectorAll("input[data-idx]");
-    for (var k = 0; k < inputs.length; k++) inputs[k].value = "";
+    GM.syncSeedInputs();
     qsSearchInput.value = "";
     GM.save(); GM.render();
   }
@@ -846,6 +857,12 @@ var GM = window.GM = window.GM || {};
             a: GM.state.meta[song].artworkUrl100,
             p: GM.state.meta[song].previewUrl || ""
         };
+        // V3.0：大乱斗条目额外携带歌名/歌手名，供接收方还原显示名
+        if (GM.state.meta[song].trackId && GM.state.meta[song].trackName) {
+          shareMeta[song].t = String(GM.state.meta[song].trackId);
+          shareMeta[song].n = GM.state.meta[song].trackName;
+          shareMeta[song].ar = GM.state.meta[song].artistName || "";
+        }
       }
     }
     
@@ -949,9 +966,9 @@ var GM = window.GM = window.GM || {};
         for (var k in res.metaData) GM.state.meta[k] = res.metaData[k];
 
         window._isSharedLink = false;
+        GM.state.brawl = GM.makeDefaultBrawl();
         GM.clearAllWinners();
-        var inputs = GM.tbody.querySelectorAll("input[data-idx]");
-        for (var q = 0; q < inputs.length; q++) inputs[q].value = GM.state.inputs[q];
+        GM.syncSeedInputs();
         GM.save(); GM.render();
         closeArtistModal();
         GM.toast("已生成对决列表，点击上方「自选歌曲」换歌");
@@ -1136,11 +1153,9 @@ var GM = window.GM = window.GM || {};
     GM.state.inputs = arr;
     
     window._isSharedLink = false;
+    GM.state.brawl = GM.makeDefaultBrawl();
     GM.clearAllWinners(); 
-    var inputs = GM.tbody.querySelectorAll("input[data-idx]");
-    for (var q = 0; q < inputs.length; q++) {
-      if (inputs[q]) inputs[q].value = GM.state.inputs[q];
-    }
+    GM.syncSeedInputs();
     GM.save(); GM.render();
     selectMask.classList.remove("show");
     GM.toast("自选歌曲已应用成功");
@@ -1149,6 +1164,475 @@ var GM = window.GM = window.GM || {};
   document.getElementById("selectClose").addEventListener("click", function() { selectMask.classList.remove("show"); });
   selectMask.addEventListener("click", function(e) { if (e.target === selectMask) selectMask.classList.remove("show"); });
   document.getElementById("qsBtnCustomSelect").addEventListener("click", openSelectModal);
+
+  /* ===== V3.0 歌曲大乱斗：比赛设置弹窗 + 挑歌视图 ===== */
+  var brawlMask = document.getElementById("brawlMask");
+  var brawlArtistInput = document.getElementById("brawlArtistInput");
+  var brawlArtistDropdown = document.getElementById("brawlArtistDropdown");
+  var brawlArtistList = document.getElementById("brawlArtistList");
+  var brawlSizeSeg = document.getElementById("brawlSizeSeg");
+  var brawlStatus = document.getElementById("brawlStatus");
+  var brawlBtnNext = document.getElementById("brawlBtnNext");
+  var brawlPickTitle = document.getElementById("brawlPickTitle");
+  var brawlTabs = document.getElementById("brawlTabs");
+  var brawlSearchInput = document.getElementById("brawlSearchInput");
+  var brawlSearchClear = document.getElementById("brawlSearchClear");
+  var brawlSortDropdown = document.getElementById("brawlSortDropdown");
+  var brawlBody = document.getElementById("brawlBody");
+  var brawlBtnSubmit = document.getElementById("brawlBtnSubmit");
+
+  var brawlFetching = false;    // 串行抓取进行中（锁定弹窗关闭与重复提交）
+  var brawlSearchTimer = null;  // 歌手搜索防抖
+  var brawlSearchSeq = 0;       // 搜索序号，丢弃过期响应
+  var brawlCandidates = [];     // 当前下拉候选项
+  var currentBrawlTab = null;   // 挑歌视图当前歌手 Tab（artistId）
+
+  function setBrawlStatus(msg, type) {
+    brawlStatus.textContent = msg;
+    brawlStatus.className = "brawl-status" + (type ? " " + type : "");
+  }
+
+  function hideBrawlDropdown() {
+    brawlArtistDropdown.classList.remove("show");
+    brawlCandidates = [];
+  }
+
+  function renderBrawlDropdown(list) {
+    var html = "";
+    for (var i = 0; i < list.length; i++) {
+      html += '<div class="brawl-drop-item" data-idx="' + i + '">' +
+        '<span class="drop-name">' + GM.esc(list[i].artistName) + '</span>' +
+        (list[i].genre ? '<span class="drop-genre">' + GM.esc(list[i].genre) + '</span>' : '') +
+        '</div>';
+    }
+    if (!list.length) {
+      html = '<div class="brawl-drop-item drop-empty">未找到相关歌手</div>';
+    }
+    brawlArtistDropdown.innerHTML = html;
+    brawlArtistDropdown.classList.add("show");
+  }
+
+  function doBrawlArtistSearch() {
+    var kw = brawlArtistInput.value.replace(/^\s+|\s+$/g, "");
+    if (!kw) { hideBrawlDropdown(); return; }
+    var seq = ++brawlSearchSeq;
+    brawlArtistDropdown.innerHTML = '<div class="brawl-drop-item drop-empty">搜索中…</div>';
+    brawlArtistDropdown.classList.add("show");
+    GM.fetchArtistCandidates(kw).then(function (list) {
+      if (seq !== brawlSearchSeq) return; // 已有更新的搜索
+      brawlCandidates = list;
+      renderBrawlDropdown(list);
+    }).catch(function (e) {
+      if (seq !== brawlSearchSeq) return;
+      console.warn("歌手候选搜索失败:", e);
+      brawlArtistDropdown.innerHTML = '<div class="brawl-drop-item drop-empty">搜索失败，请检查网络</div>';
+      brawlArtistDropdown.classList.add("show");
+    });
+  }
+
+  function renderBrawlArtistList() {
+    var arr = GM.state.brawl.artists;
+    var html = "";
+    for (var i = 0; i < arr.length; i++) {
+      html += '<div class="brawl-artist-row">' +
+        '<span class="row-name">' + GM.esc(arr[i].artistName) + '</span>' +
+        '<span class="row-del" data-id="' + GM.esc(arr[i].artistId) + '" title="移除">✕</span>' +
+        '</div>';
+    }
+    brawlArtistList.innerHTML = html;
+  }
+
+  function syncBrawlSizeSeg() {
+    var items = brawlSizeSeg.querySelectorAll(".brawl-size-item");
+    for (var i = 0; i < items.length; i++) {
+      items[i].classList.toggle("active", +items[i].getAttribute("data-v") === GM.state.brawl.size);
+    }
+  }
+
+  function addBrawlArtist(a) {
+    var b = GM.state.brawl;
+    if (!a || !a.artistId) return;
+    if (b.artists.length >= 10) { GM.toast("最多添加 10 位歌手", 2000); return; }
+    for (var i = 0; i < b.artists.length; i++) {
+      if (b.artists[i].artistId === a.artistId) {
+        GM.toast("「" + a.artistName + "」已在列表中", 2000);
+        return;
+      }
+    }
+    b.artists.push({ artistId: String(a.artistId), artistName: a.artistName });
+    setBrawlStatus("");
+    brawlArtistInput.value = "";
+    hideBrawlDropdown();
+    renderBrawlArtistList();
+    GM.save();
+    brawlArtistInput.focus();
+  }
+
+  function openBrawlModal() {
+    if (brawlFetching) return;
+    setBrawlStatus("");
+    brawlArtistInput.value = "";
+    hideBrawlDropdown();
+    renderBrawlArtistList();
+    syncBrawlSizeSeg();
+    brawlMask.classList.add("show");
+    brawlArtistInput.focus();
+  }
+  function closeBrawlModal() { brawlMask.classList.remove("show"); }
+
+  document.getElementById("btnBrawlEntry").addEventListener("click", openBrawlModal);
+  document.getElementById("brawlBtnEdit").addEventListener("click", openBrawlModal);
+  // 挑歌视图右上角关闭：回到快速开始页（进度保留，可从入口继续）
+  document.getElementById("brawlPickClose").addEventListener("click", function () {
+    var b = GM.state.brawl;
+    b.picking = false; // 用户主动关闭，刷新后不再自动进入挑歌视图
+    GM.save();
+    GM.switchTab("quick");
+    GM.render();
+    GM.toast("挑歌进度已保存，可从「歌曲大乱斗」入口继续", 2000);
+  });
+  document.getElementById("brawlClose").addEventListener("click", function () {
+    if (brawlFetching) return;
+    closeBrawlModal();
+  });
+  brawlMask.addEventListener("click", function (e) {
+    if (e.target === brawlMask && !brawlFetching) closeBrawlModal();
+  });
+
+  brawlArtistInput.addEventListener("input", function () {
+    if (brawlSearchTimer) clearTimeout(brawlSearchTimer);
+    brawlSearchTimer = setTimeout(doBrawlArtistSearch, 350);
+  });
+  brawlArtistInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (brawlSearchTimer) { clearTimeout(brawlSearchTimer); brawlSearchTimer = null; }
+      if (brawlCandidates.length > 0) {
+        addBrawlArtist(brawlCandidates[0]); // 回车快捷添加第一个候选
+      } else {
+        doBrawlArtistSearch();
+      }
+    }
+  });
+  brawlArtistDropdown.addEventListener("click", function (e) {
+    var item = e.target.closest ? e.target.closest(".brawl-drop-item") : null;
+    if (!item || item.classList.contains("drop-empty")) return;
+    var idx = +item.getAttribute("data-idx");
+    if (brawlCandidates[idx]) addBrawlArtist(brawlCandidates[idx]);
+  });
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest || !e.target.closest(".brawl-search-wrap")) hideBrawlDropdown();
+  });
+
+  brawlArtistList.addEventListener("click", function (e) {
+    var del = e.target.closest ? e.target.closest(".row-del") : null;
+    if (!del) return;
+    var id = del.getAttribute("data-id");
+    var b = GM.state.brawl;
+    b.artists = b.artists.filter(function (a) { return a.artistId !== id; });
+    renderBrawlArtistList();
+    GM.save();
+    setBrawlStatus("");
+  });
+
+  brawlSizeSeg.addEventListener("click", function (e) {
+    var item = e.target.closest ? e.target.closest(".brawl-size-item") : null;
+    if (!item) return;
+    GM.state.brawl.size = +item.getAttribute("data-v");
+    syncBrawlSizeSeg();
+    GM.save();
+  });
+
+  /* ===== 下一步：串行抓取所有歌手歌曲（带缓存跳过与进度提示） ===== */
+  brawlBtnNext.addEventListener("click", async function () {
+    var b = GM.state.brawl;
+    if (brawlFetching) return;
+    if (b.artists.length < 2) { GM.toast("请至少添加 2 位歌手", 2000); return; }
+
+    brawlFetching = true;
+    brawlBtnNext.disabled = true;
+    hideBrawlDropdown();
+    var failName = "";
+    var newPool = {};
+
+    try {
+      for (var i = 0; i < b.artists.length; i++) {
+        var a = b.artists[i];
+        failName = a.artistName;
+        // 已抓取过的歌手直接复用本地缓存，避免重复请求
+        if (b.pool[a.artistId] && b.pool[a.artistId].length > 0) {
+          newPool[a.artistId] = b.pool[a.artistId];
+          setBrawlStatus("（" + (i + 1) + "/" + b.artists.length + "）「" + a.artistName + "」歌曲已就绪…");
+          continue;
+        }
+        setBrawlStatus("（" + (i + 1) + "/" + b.artists.length + "）正在抓取「" + a.artistName + "」的歌曲…");
+        var songs = await GM.fetchArtistSongsById(a.artistId, a.artistName);
+        var ids = [];
+        for (var s = 0; s < songs.length; s++) {
+          ids.push(songs[s].trackId);
+          GM.state.meta[songs[s].trackId] = songs[s]; // 全量注册入 meta
+        }
+        newPool[a.artistId] = ids;
+        b.pool = newPool;
+        GM.save(); // 每完成一位歌手立即固化，防止中途断网全丢
+      }
+
+      b.pool = newPool;
+      // 裁剪已选：仅保留仍存在于新歌池中的 trackId
+      var valid = {};
+      for (var pid in newPool) {
+        for (var t = 0; t < newPool[pid].length; t++) valid[newPool[pid][t]] = 1;
+      }
+      b.selected = (b.selected || []).filter(function (id) { return valid[id]; });
+      b.picking = true;
+      currentBrawlTab = b.artists[0].artistId;
+      GM.save();
+      closeBrawlModal();
+      openBrawlPickView();
+    } catch (e) {
+      console.warn("大乱斗歌曲抓取失败:", e);
+      setBrawlStatus("");
+      GM.toast("「" + failName + "」歌曲抓取失败，请检查网络后重试", 2500);
+    } finally {
+      brawlFetching = false;
+      brawlBtnNext.disabled = false;
+    }
+  });
+
+  /* ===== 挑歌视图 ===== */
+  function openBrawlPickView() {
+    var b = GM.state.brawl;
+    if (!currentBrawlTab || !b.pool[currentBrawlTab]) {
+      currentBrawlTab = b.artists[0] ? b.artists[0].artistId : null;
+    }
+    brawlSearchInput.value = "";
+    brawlSearchClear.style.display = "none";
+    brawlSortDropdown.value = "default";
+    brawlPickTitle.textContent = "共 " + b.artists.length + " 个歌手，一共抽 " + b.size + " 首歌比赛";
+    renderBrawlTabs();
+    renderBrawlList();
+    GM.switchTab("brawl");
+    window.scrollTo(0, 0);
+  }
+
+  function renderBrawlTabs() {
+    var b = GM.state.brawl;
+    var html = "";
+    for (var i = 0; i < b.artists.length; i++) {
+      var a = b.artists[i];
+      html += '<button class="brawl-tab' + (a.artistId === currentBrawlTab ? " active" : "") +
+        '" data-id="' + GM.esc(a.artistId) + '">' + GM.esc(a.artistName) + '</button>';
+    }
+    brawlTabs.innerHTML = html;
+  }
+
+  function updateBrawlFooter() {
+    var b = GM.state.brawl;
+    var M = b.selected.length, N = b.size;
+    if (M >= N) {
+      brawlBtnSubmit.disabled = false;
+      brawlBtnSubmit.textContent = "生成对阵";
+    } else {
+      brawlBtnSubmit.disabled = true;
+      brawlBtnSubmit.textContent = "合计已选 " + M + " / " + N;
+    }
+  }
+
+  function renderBrawlList() {
+    var b = GM.state.brawl;
+    var kw = brawlSearchInput.value.trim().toLowerCase();
+    var sortType = brawlSortDropdown.value;
+    var poolIds = b.pool[currentBrawlTab] || [];
+    var listToRender = [];
+
+    for (var i = 0; i < poolIds.length; i++) {
+      var m = GM.state.meta[poolIds[i]];
+      if (!m || !m.trackName) continue;
+      if (kw && m.trackName.toLowerCase().indexOf(kw) === -1) continue;
+      var year = m.releaseDate ? m.releaseDate.substring(0, 4) : "未知";
+      var sortYear = year === "未知" ? 9999 : parseInt(year);
+      listToRender.push({ id: poolIds[i], name: m.trackName, year: year, sortYear: sortYear, originalIndex: i });
+    }
+
+    if (sortType === "asc") {
+      listToRender.sort(function (a2, b2) {
+        if (a2.sortYear !== b2.sortYear) return a2.sortYear - b2.sortYear;
+        return a2.originalIndex - b2.originalIndex;
+      });
+    } else if (sortType === "desc") {
+      listToRender.sort(function (a2, b2) {
+        if (a2.sortYear !== b2.sortYear) {
+          if (a2.sortYear === 9999) return 1;
+          if (b2.sortYear === 9999) return -1;
+          return b2.sortYear - a2.sortYear;
+        }
+        return a2.originalIndex - b2.originalIndex;
+      });
+    }
+
+    var html = "";
+    var currentYear = null;
+    for (var j = 0; j < listToRender.length; j++) {
+      var item = listToRender[j];
+      if (sortType !== "default" && item.year !== currentYear) {
+        currentYear = item.year;
+        html += '<div class="sel-year-header">' + currentYear + (currentYear !== "未知" ? " 年" : "年份") + '</div>';
+      }
+      var isSelected = b.selected.indexOf(item.id) !== -1;
+      html += '<div class="select-card' + (isSelected ? " selected" : "") + '" data-tid="' + GM.esc(item.id) + '">' +
+        '<div class="sel-name" title="' + GM.esc(item.name) + '">' + GM.esc(item.name) + '</div>' +
+        '<div class="sel-card-bottom">' +
+        '<div class="sel-year">' + item.year + '</div>' +
+        '<div class="sel-check">✓</div>' +
+        '</div></div>';
+    }
+
+    brawlBody.innerHTML = html || '<div style="color: rgba(255,255,255,0.4); text-align: center; grid-column: 1/-1; padding-top: 40px;">暂无匹配歌曲</div>';
+    updateBrawlFooter();
+  }
+
+  brawlTabs.addEventListener("click", function (e) {
+    var tab = e.target.closest ? e.target.closest(".brawl-tab") : null;
+    if (!tab) return;
+    var id = tab.getAttribute("data-id");
+    if (id === currentBrawlTab) return;
+    currentBrawlTab = id; // 仅切换数据源映射，不触发网络请求
+    renderBrawlTabs();
+    renderBrawlList();
+  });
+
+  brawlBody.addEventListener("click", function (e) {
+    var card = e.target.closest ? e.target.closest(".select-card") : null;
+    if (!card) return;
+    var tid = card.getAttribute("data-tid");
+    var b = GM.state.brawl;
+    var idx = b.selected.indexOf(tid);
+    if (idx !== -1) {
+      b.selected.splice(idx, 1);
+      card.classList.remove("selected");
+    } else {
+      if (b.selected.length >= b.size) {
+        GM.toast("最多选择 " + b.size + " 首，可先取消其他歌曲");
+        return;
+      }
+      b.selected.push(tid);
+      card.classList.add("selected");
+    }
+    GM.save(); // 每次勾选立即固化，支持断点恢复
+    updateBrawlFooter();
+  });
+
+  brawlSearchInput.addEventListener("input", function () {
+    brawlSearchClear.style.display = this.value ? "block" : "none";
+    renderBrawlList();
+  });
+  brawlSearchClear.addEventListener("click", function () {
+    brawlSearchInput.value = "";
+    this.style.display = "none";
+    renderBrawlList();
+  });
+  brawlSortDropdown.addEventListener("change", renderBrawlList);
+
+  document.getElementById("brawlBtnClear").addEventListener("click", function () {
+    var b = GM.state.brawl;
+    var poolIds = b.pool[currentBrawlTab] || [];
+    var idSet = {};
+    for (var i = 0; i < poolIds.length; i++) idSet[poolIds[i]] = 1;
+    var before = b.selected.length;
+    b.selected = b.selected.filter(function (id) { return !idSet[id]; });
+    if (b.selected.length === before) { GM.toast("当前歌手暂无勾选"); return; }
+    GM.save();
+    renderBrawlList();
+    GM.toast("已清空当前歌手的勾选");
+  });
+
+  /* ===== 随机抽：按配额 N/x 抽取当前歌手歌曲 ===== */
+  document.getElementById("brawlBtnRand").addEventListener("click", function () {
+    var b = GM.state.brawl;
+    var poolIds = (b.pool[currentBrawlTab] || []).slice();
+    if (!poolIds.length) { GM.toast("当前歌手暂无歌曲"); return; }
+
+    var idSet = {};
+    for (var i = 0; i < poolIds.length; i++) idSet[poolIds[i]] = 1;
+    var otherSelected = b.selected.filter(function (id) { return !idSet[id]; });
+
+    var quota = Math.round(b.size / b.artists.length); // N/x，四舍五入
+    var allowed = Math.min(quota, poolIds.length, b.size - otherSelected.length);
+    if (allowed <= 0) {
+      GM.toast("已达总数上限 " + b.size + " 首，请先取消部分歌曲");
+      return;
+    }
+
+    for (var k = poolIds.length - 1; k > 0; k--) {
+      var j = Math.floor(Math.random() * (k + 1));
+      var tmp = poolIds[k]; poolIds[k] = poolIds[j]; poolIds[j] = tmp;
+    }
+    b.selected = otherSelected.concat(poolIds.slice(0, allowed));
+    GM.save();
+    renderBrawlList();
+    GM.toast("已为当前歌手随机抽取 " + allowed + " 首");
+  });
+
+  /* ===== 封盘提交：洗牌后接轨对阵列表 ===== */
+  brawlBtnSubmit.addEventListener("click", function () {
+    var b = GM.state.brawl;
+    if (b.selected.length !== b.size) return;
+
+    // 1. 数据转换与洗牌
+    var arr = b.selected.slice();
+    for (var k = arr.length - 1; k > 0; k--) {
+      var j = Math.floor(Math.random() * (k + 1));
+      var tmp = arr[k]; arr[k] = arr[j]; arr[j] = tmp;
+    }
+
+    // 2. 赛制与对阵树重置
+    if (GM.state.size !== b.size) {
+      GM.state.size = b.size;
+      syncSizeSeg();
+    }
+    GM.state.winners = GM.makeWinners(b.size);
+    GM.state.inputs = arr;
+    GM.state.title = "歌曲大乱斗";
+    document.getElementById("titleInput").value = GM.state.title;
+
+    // 3. 头部封面与主题色：从参赛歌曲封面中随机抽取
+    var covers = [];
+    var seenCover = {};
+    for (var c = 0; c < arr.length; c++) {
+      var m = GM.state.meta[arr[c]];
+      if (m && m.artworkUrl100) {
+        var url = m.artworkUrl100.replace('100x100bb', '600x600bb');
+        if (!seenCover[url]) { seenCover[url] = 1; covers.push(url); }
+      }
+    }
+    for (var k2 = covers.length - 1; k2 > 0; k2--) {
+      var j2 = Math.floor(Math.random() * (k2 + 1));
+      var tmp2 = covers[k2]; covers[k2] = covers[j2]; covers[j2] = tmp2;
+    }
+    GM.state.covers = covers.slice(0, 8);
+    GM.state.avgColor = null;
+    GM.state.allFetchedSongs = []; // 清空单歌手缓存，「自选歌曲」按钮自动隐藏
+    window._isSharedLink = false;
+
+    // 4. 模式锁死 & 精简本地缓存（仅保留参赛歌曲的 meta）
+    var keep = {};
+    for (var p = 0; p < arr.length; p++) keep[arr[p]] = 1;
+    var newMeta = {};
+    for (var mk in GM.state.meta) {
+      if (!GM.state.meta[mk].trackId || keep[mk]) newMeta[mk] = GM.state.meta[mk];
+    }
+    GM.state.meta = newMeta;
+    b.active = true;
+    b.picking = false;
+    b.pool = {};
+    b.selected = [];
+
+    GM.buildTable();
+    GM.save();
+    GM.switchTab("quick");
+    GM.render();
+    GM.toast("已生成大乱斗对阵，点击「开始对阵」开战吧！", 2500);
+  });
 
   /* ===== 视图切换、顶部菜单与全局初始化 ===== */
   var topMoreMenu = document.getElementById("topMoreMenu");
@@ -1268,8 +1752,7 @@ var GM = window.GM = window.GM || {};
     for (var m = 0; m < arr.length && m < GM.seeds(); m++) next[m] = arr[m];
     GM.state.inputs = next;
     GM.clearAllWinners();
-    var inputs = GM.tbody.querySelectorAll("input[data-idx]");
-    for (var q = 0; q < inputs.length; q++) inputs[q].value = GM.state.inputs[q];
+    GM.syncSeedInputs();
     GM.save(); GM.render();
     GM.toast("已随机分组");
   }
@@ -1300,6 +1783,7 @@ var GM = window.GM = window.GM || {};
     GM.state.covers = [];
     GM.state.allFetchedSongs = []; 
     GM.state.avgColor = null;
+    GM.state.brawl = GM.makeDefaultBrawl();
     GM.state.title = "金曲世界杯";
     document.getElementById("titleInput").value = GM.state.title;
     GM.buildTable();
@@ -1350,6 +1834,7 @@ var GM = window.GM = window.GM || {};
            GM.state.covers = parsedData.c || [];
            GM.state.avgColor = null; 
            GM.state.allFetchedSongs = []; 
+           GM.state.brawl = GM.makeDefaultBrawl();
            GM.state.winners = GM.makeWinners(GM.state.size);
            
            // 【核心修复 2】：解析时也要兼容读取试听链接
@@ -1365,11 +1850,18 @@ var GM = window.GM = window.GM || {};
                  };
                } else {
                  // 新版本：包含图片与试听链接
-                 GM.state.meta[songKey] = {
+                 var metaObj = {
                    artworkUrl100: mData.a || "",
                    previewUrl: mData.p || "",
                    source: 'api'
                  };
+                 // V3.0：还原大乱斗条目的显示名信息
+                 if (mData.t && mData.n) {
+                   metaObj.trackId = mData.t;
+                   metaObj.trackName = mData.n;
+                   metaObj.artistName = mData.ar || "";
+                 }
+                 GM.state.meta[songKey] = metaObj;
                }
              }
            }
@@ -1394,6 +1886,20 @@ var GM = window.GM = window.GM || {};
       });
   } else {
     initApp();
+    // V3.0：大乱斗挑歌中断恢复 —— 上次挑歌未提交，直接回到挑歌视图
+    var b0 = GM.state.brawl;
+    if (b0 && b0.picking && b0.artists.length >= 2) {
+      var hasPool = false;
+      for (var pi = 0; pi < b0.artists.length; pi++) {
+        if ((b0.pool[b0.artists[pi].artistId] || []).length > 0) { hasPool = true; break; }
+      }
+      if (hasPool) {
+        openBrawlPickView();
+      } else {
+        b0.picking = false;
+        GM.save();
+      }
+    }
   }
 
 })();

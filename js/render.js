@@ -55,10 +55,10 @@ GM.buildTable = function () {
 
   var inputs = GM.tbody.querySelectorAll("input[data-idx]");
   for (var k = 0; k < inputs.length; k++) {
-    inputs[k].value = GM.state.inputs[k];
     inputs[k].addEventListener("input", GM.onSeedInput);
 
     inputs[k].addEventListener("focus", function (e) {
+      if (e.target.readOnly) return; // 大乱斗锁定项不产生手动 meta
       var v = e.target.value.slice(0, 30);
       if (v) {
         if (!GM.state.meta[v]) GM.state.meta[v] = {};
@@ -79,7 +79,28 @@ GM.buildTable = function () {
       }
     });
   }
+  GM.syncSeedInputs();
   document.getElementById("titleInput").value = GM.state.title;
+};
+
+/* ===== 种子输入框同步：大乱斗 trackId 项显示翻译名并锁定为只读 ===== */
+GM.syncSeedInputs = function () {
+  var inputs = GM.tbody.querySelectorAll("input[data-idx]");
+  for (var q = 0; q < inputs.length; q++) {
+    var raw = GM.state.inputs[q] || "";
+    var m = raw && GM.state.meta[raw];
+    if (m && m.trackId && m.trackName) {
+      inputs[q].value = GM.getDisplayName(raw);
+      inputs[q].readOnly = true;
+      inputs[q].classList.add("locked");
+      inputs[q].title = GM.getDisplayName(raw);
+    } else {
+      inputs[q].value = raw;
+      inputs[q].readOnly = false;
+      inputs[q].classList.remove("locked");
+      inputs[q].removeAttribute("title");
+    }
+  }
 };
 
 /* ===== 核心渲染函数 ===== */
@@ -91,16 +112,17 @@ GM.render = function () {
     var r = +cell.getAttribute("data-r");
     var i = +cell.getAttribute("data-i");
     var v = GM.state.winners[r][i];
+    var dv = GM.getDisplayName(v);
     var inner = "";
     if (v) {
       cell.classList.add("filled");
       if (r === last) {
         inner = '<span class="champ-icon">🏆</span>' +
-          '<span class="name champ champ-name" title="' + GM.esc(v) + '">' + GM.esc(v) + "</span>";
+          '<span class="name champ champ-name" title="' + GM.esc(dv) + '">' + GM.esc(dv) + "</span>";
       } else {
         var advanced = GM.state.winners[r + 1][i >> 1] === v;
         var cls = advanced ? "name winner" : "name";
-        inner = '<span class="' + cls + '" title="' + GM.esc(v) + '">' + GM.esc(v) + "</span>";
+        inner = '<span class="' + cls + '" title="' + GM.esc(dv) + '">' + GM.esc(dv) + "</span>";
       }
     } else {
       cell.classList.remove("filled");
@@ -184,6 +206,7 @@ GM.renderQuickStart = function (done, TM) {
         if (i + j >= N) break;
         var num = (i + j + 1).toString().padStart(2, '0');
         var val = GM.state.inputs[i + j].trim() || "（未知）";
+        var dVal = (val === "（未知）") ? val : GM.getDisplayName(val, false); // 对阵列表仅显示歌曲名
 
         var displayNum = num + ".";
         var isEmoji = false;
@@ -196,7 +219,7 @@ GM.renderQuickStart = function (done, TM) {
         }
 
         var clsName = isEmoji ? "qs-item-idx emoji" : "qs-item-idx";
-        listHtml += '<div class="qs-item-line"><span class="' + clsName + '">' + displayNum + '</span><span class="qs-item-name" title="' + GM.esc(val) + '">' + GM.esc(val) + '</span></div>';
+        listHtml += '<div class="qs-item-line"><span class="' + clsName + '">' + displayNum + '</span><span class="qs-item-name" title="' + GM.esc(dVal) + '">' + GM.esc(dVal) + '</span></div>';
       }
       listHtml += '</div>';
     }
@@ -242,6 +265,7 @@ GM.switchTab = function (isQuick) {
 
 /* ===== 种子输入处理 ===== */
 GM.onSeedInput = function (e) {
+  if (e.target.readOnly) return; // 大乱斗锁定项不可编辑
   var k = +e.target.getAttribute("data-idx");
   var v = e.target.value.slice(0, 30);
   if (v !== e.target.value) e.target.value = v;

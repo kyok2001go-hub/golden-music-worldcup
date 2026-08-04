@@ -160,6 +160,120 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
   }
 };
 
+/* ===== V3.0 歌曲大乱斗：歌手候选搜索（entity=musicArtist） ===== */
+GM.fetchArtistCandidates = function (term) {
+  var query = "/search?term=" + encodeURIComponent(term) + "&entity=musicArtist&attribute=artistTerm&limit=10&country=CN";
+  var targetUrl = GM.BASE_URL + query;
+
+  function parse(data) {
+    var results = (data && data.results) || [];
+    var out = [];
+    var seen = {};
+    for (var i = 0; i < results.length; i++) {
+      var it = results[i];
+      if (!it || !it.artistId || !it.artistName) continue;
+      var id = String(it.artistId);
+      if (seen[id]) continue;
+      seen[id] = 1;
+      out.push({ artistId: id, artistName: it.artistName, genre: it.primaryGenreName || "" });
+      if (out.length >= 8) break;
+    }
+    return out;
+  }
+
+  return GM.get(targetUrl).then(parse).catch(function (e) {
+    console.warn("歌手候选直连失败，启用 Functions 代理", e);
+    return fetch("/api/search?term=" + encodeURIComponent(term) + "&entity=musicArtist")
+      .then(function (res) {
+        if (!res.ok) throw new Error("Functions API Error");
+        return res.json();
+      })
+      .then(parse)
+      .catch(function (e2) {
+        console.warn("Functions 代理失败，降级到公共 CORS 代理:", e2);
+        return new Promise(function (resolve, reject) {
+          GM.fetchJson(GM.CORS_PROXY + encodeURIComponent(targetUrl), function (err, data) {
+            if (err) { reject(err); return; }
+            resolve(parse(data));
+          });
+        });
+      });
+  });
+};
+
+/* ===== V3.0 歌曲大乱斗：解析某歌手的完整歌单（按 artistId 精确查询） ===== */
+GM.handleBrawlSongs = function (artistId, artistName, data) {
+  var results = (data && data.results) || [];
+  var seen = {};
+  var songs = [];
+
+  for (var i = 0; i < results.length; i++) {
+    var it = results[i];
+    // lookup 接口首条为歌手本体，需剔除；仅保留歌曲条目
+    if (!it || it.wrapperType !== "track" || it.kind !== "song") continue;
+    if (!it.trackId || !it.trackName) continue;
+    var track = (it.trackName || "").replace(/^\s+|\s+$/g, "");
+    if (!track) continue;
+    if (/(live|remix|acoustic)/i.test(track)) continue;
+    var key = track.toLowerCase();
+    if (seen[key]) continue;
+    seen[key] = 1;
+
+    songs.push({
+      trackId: String(it.trackId),
+      trackName: track,
+      artistId: String(it.artistId || artistId),
+      artistName: it.artistName || artistName || "",
+      collectionName: it.collectionName || "",
+      releaseDate: it.releaseDate || "",
+      artworkUrl100: it.artworkUrl100 || "",
+      previewUrl: it.previewUrl || "",
+      source: 'api'
+    });
+    if (songs.length >= 200) break;
+  }
+  return songs;
+};
+
+/* ===== V3.0 歌曲大乱斗：按 artistId 抓取歌曲（Promise 风格，供串行队列 await） ===== */
+GM.fetchArtistSongsById = function (artistId, artistName) {
+  var query = "/lookup?id=" + encodeURIComponent(artistId) + "&entity=song&limit=200&country=CN";
+  var targetUrl = GM.BASE_URL + query;
+
+  function parse(data) {
+    return GM.handleBrawlSongs(artistId, artistName, data);
+  }
+
+  return GM.get(targetUrl).then(function (data) {
+    var songs = parse(data);
+    if (songs.length === 0) throw new Error("EMPTY");
+    return songs;
+  }).catch(function (e) {
+    console.warn("按 artistId 直连失败，启用 Functions 代理", e);
+    return fetch("/api/search?artistId=" + encodeURIComponent(artistId))
+      .then(function (res) {
+        if (!res.ok) throw new Error("Functions API Error");
+        return res.json();
+      })
+      .then(function (data) {
+        var songs = parse(data);
+        if (songs.length === 0) throw new Error("EMPTY");
+        return songs;
+      })
+      .catch(function (e2) {
+        console.warn("Functions 代理失败，降级到公共 CORS 代理:", e2);
+        return new Promise(function (resolve, reject) {
+          GM.fetchJson(GM.CORS_PROXY + encodeURIComponent(targetUrl), function (err, data) {
+            if (err) { reject(err); return; }
+            var songs = parse(data);
+            if (songs.length === 0) { reject(new Error("EMPTY")); return; }
+            resolve(songs);
+          });
+        });
+      });
+  });
+};
+
 GM.extractCoversFromApiRes = function (res) {
   var allCovers = [];
   for (var i = 0; i < res.songs.length; i++) {

@@ -26,6 +26,18 @@ GM.makeWinners = function (seeds) {
   return arr;
 };
 
+/* ===== 歌曲大乱斗默认状态 ===== */
+GM.makeDefaultBrawl = function () {
+  return {
+    active: false,      // 是否已通过大乱斗生成对阵（模式锁死标记）
+    picking: false,     // 是否处于挑歌阶段（断点恢复依据）
+    size: 64,           // 赛制（64/32/16）
+    artists: [],        // 待选歌手 [{ artistId, artistName }]（2~10 个）
+    pool: {},           // 歌池 { artistId: [trackId, ...] }（按热门排序）
+    selected: []        // 已勾选的 trackId 数组
+  };
+};
+
 GM.state = {
   size: 64,
   title: "金曲世界杯",
@@ -34,7 +46,8 @@ GM.state = {
   meta: {},
   covers: [],
   avgColor: null,
-  allFetchedSongs: [] // V2.3 新增：用于缓存获取到的 200 首完整歌单
+  allFetchedSongs: [], // V2.3 新增：用于缓存获取到的 200 首完整歌单
+  brawl: GM.makeDefaultBrawl() // V3.0 新增：歌曲大乱斗专用状态
 };
 
 /* ===== 状态查询函数 ===== */
@@ -54,6 +67,18 @@ GM.isInputsEmpty = function () {
 GM.esc = function (s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+};
+
+/* ===== 显示名转义层：将 trackId 翻译为「歌曲名 (歌手名)」 ===== */
+/* withArtist === false 时仅返回歌曲名（用于对阵列表、导出图片等紧凑场景） */
+GM.getDisplayName = function (val, withArtist) {
+  if (!val) return val;
+  var m = GM.state.meta[val];
+  if (m && m.trackId && m.trackName) {
+    if (withArtist === false) return m.trackName;
+    return m.artistName ? (m.trackName + " (" + m.artistName + ")") : m.trackName;
+  }
+  return val;
 };
 
 /* ===== 本地存储 ===== */
@@ -77,6 +102,34 @@ GM.load = function () {
       GM.state.covers = s.covers || [];
       GM.state.avgColor = s.avgColor || null;
       GM.state.allFetchedSongs = s.allFetchedSongs || []; // 恢复缓存的 200 首
+
+      // V3.0：恢复大乱斗状态（逐项校验，脏数据自动回退默认）
+      var b = s.brawl;
+      var db = GM.makeDefaultBrawl();
+      if (b && typeof b === "object") {
+        db.active = !!b.active;
+        db.picking = !!b.picking;
+        if (GM.SIZE_CONFIG[b.size]) db.size = b.size;
+        if (Array.isArray(b.artists)) {
+          for (var ai = 0; ai < b.artists.length && db.artists.length < 10; ai++) {
+            var a = b.artists[ai];
+            if (a && a.artistId && a.artistName) {
+              db.artists.push({ artistId: String(a.artistId), artistName: String(a.artistName) });
+            }
+          }
+        }
+        if (b.pool && typeof b.pool === "object") {
+          for (var pid in b.pool) {
+            if (Array.isArray(b.pool[pid])) {
+              db.pool[pid] = b.pool[pid].map(function (v) { return String(v); });
+            }
+          }
+        }
+        if (Array.isArray(b.selected)) {
+          db.selected = b.selected.map(function (v) { return String(v); });
+        }
+      }
+      GM.state.brawl = db;
       
       var expect = GM.makeWinners(s.size);
       GM.state.winners = expect.map(function (arr, r) {
