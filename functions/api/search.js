@@ -24,8 +24,7 @@ export async function onRequest(context) {
   }
 
   try {
-    // 3. 核心：由 Cloudflare 代理请求苹果服务器，并伪装 User-Agent 为桌面端
-    // 这样苹果就不会返回针对移动端的拦截逻辑（拉起 Apple Music App）
+    // 3. 由 Cloudflare 代理请求苹果服务器，伪装 User-Agent
     const response = await fetch(targetUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -39,7 +38,6 @@ export async function onRequest(context) {
       status: 200,
       headers: {
         "Content-Type": "application/json;charset=UTF-8",
-        // 允许跨域（虽然都在同一个 pages.dev 域名下，但加上更保险）
         "Access-Control-Allow-Origin": "*", 
       }
     });

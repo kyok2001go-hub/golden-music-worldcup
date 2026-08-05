@@ -102,7 +102,7 @@ GM.handleSongs = function (name, data) {
       collectionName: it.collectionName || "",
       releaseDate: it.releaseDate || "",
       artworkUrl100: it.artworkUrl100 || "",
-      previewUrl: it.previewUrl || "", // 【核心修改】：添加试听链接缓存
+      previewUrl: it.previewUrl || "",
       source: 'api'
     };
   }
