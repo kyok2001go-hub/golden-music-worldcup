@@ -111,8 +111,8 @@ GM.handleSongs = function (name, data) {
 
 /* ===== 核心获取歌手歌曲（单歌手模式） ===== */
 GM.coreFetchArtist = function (name, onSuccess, onFail) {
-  // 【修复】移除 &attribute=artistTerm
-  var query = "/search?term=" + encodeURIComponent(name) + "&entity=song&limit=200&country=CN";
+  // 【修复】：追加 &lang=zh_cn，确保语境纯净
+  var query = "/search?term=" + encodeURIComponent(name) + "&entity=song&attribute=artistTerm&limit=200&country=CN&lang=zh_cn";
   var targetUrl = GM.BASE_URL + query;
   
   function onData(data) {
@@ -160,21 +160,29 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
   }
 };
 
-/* ===== V3.0.3终极优化 歌曲大乱斗：废弃歌手接口，从歌曲里提取歌手 ===== */
+/* ===== V3.0.4 终极双通道 歌曲大乱斗：歌手候选搜索 ===== */
 GM.fetchArtistCandidates = function (term) {
-  // 【核心修复】不搜歌手了，直接搜歌（entity=song），绕开苹果残缺的歌手库索引
-  var query = "/search?term=" + encodeURIComponent(term) + "&entity=song&limit=30&country=CN";
-  var targetUrl = GM.BASE_URL + query;
+  var queryArtist = "/search?term=" + encodeURIComponent(term) + "&entity=musicArtist&attribute=artistTerm&limit=10&country=CN&lang=zh_cn";
+  var targetUrlArtist = GM.BASE_URL + queryArtist;
 
-  function parse(data) {
+  // 1. 提取官方歌手实体结果
+  function parseArtistData(data) {
     var results = (data && data.results) || [];
     var out = [];
     var seen = {};
+    var kw = (term || "").toLowerCase();
     for (var i = 0; i < results.length; i++) {
       var it = results[i];
       if (!it || !it.artistId || !it.artistName) continue;
+      
+      // 【核心防御】：防止苹果返回“乱七八糟不包含关键字的合集歌手”导致不触发降级
+      // 因为加了 lang=zh_cn，简繁差异已抹平，可以放心校验
+      var nameLower = it.artistName.toLowerCase();
+      if (nameLower.indexOf(kw) === -1 && kw.indexOf(nameLower) === -1) {
+        continue; // 丢弃不相关的假阳性歌手
+      }
+
       var id = String(it.artistId);
-      // 利用歌曲中的 artistId 进行去重
       if (seen[id]) continue;
       seen[id] = 1;
       out.push({ artistId: id, artistName: it.artistName, genre: it.primaryGenreName || "" });
@@ -183,23 +191,68 @@ GM.fetchArtistCandidates = function (term) {
     return out;
   }
 
-  return GM.get(targetUrl).then(parse).catch(function (e) {
-    console.warn("歌手候选直连失败，启用 Functions 代理", e);
-    // 告知后端这次是要提取候选人
-    return fetch("/api/search?term=" + encodeURIComponent(term) + "&entity=artist_candidate")
-      .then(function (res) {
-        if (!res.ok) throw new Error("Functions API Error");
-        return res.json();
+  // 2. 智能拆分合作歌手名称
+  function extractCleanName(rawName, kw) {
+    if (!rawName) return kw;
+    var cleanKW = kw.trim().toLowerCase();
+    var parts = rawName.split(/[,&/、;]|\s+feat\.?\s+|\s+Feat\.?\s+|\s+与\s+|\s+和\s+/i);
+    for (var p = 0; p < parts.length; p++) {
+      var part = parts[p].trim();
+      if (part.toLowerCase().indexOf(cleanKW) !== -1 || cleanKW.indexOf(part.toLowerCase()) !== -1) {
+        return part;
+      }
+    }
+    return rawName;
+  }
+
+  // 3. 从歌曲列表中提取歌手（降级方案）
+  function parseSongData(data) {
+    var results = (data && data.results) || [];
+    var out = [];
+    var seen = {};
+    for (var i = 0; i < results.length; i++) {
+      var it = results[i];
+      if (!it || !it.artistId || !it.artistName) continue;
+      var id = String(it.artistId);
+      if (seen[id]) continue;
+      seen[id] = 1;
+
+      var cleanName = extractCleanName(it.artistName, term);
+      out.push({ artistId: id, artistName: cleanName, genre: it.primaryGenreName || "" });
+      if (out.length >= 8) break;
+    }
+    return out;
+  }
+
+  // 降级查询歌曲库
+  function fallbackToSongSearch() {
+    // 【核心修复】：追加 &lang=zh_cn，防止降级通道语言漂移
+    var querySong = "/search?term=" + encodeURIComponent(term) + "&entity=song&attribute=artistTerm&limit=40&country=CN&lang=zh_cn";
+    var targetUrlSong = GM.BASE_URL + querySong;
+
+    return GM.get(targetUrlSong).then(parseSongData).catch(function () {
+      return fetch("/api/search?term=" + encodeURIComponent(term) + "&entity=song")
+        .then(function (res) { return res.json(); })
+        .then(parseSongData)
+        .catch(function () { return []; });
+    });
+  }
+
+  // 优先查询官方歌手实体库
+  return GM.get(targetUrlArtist).then(function (data) {
+    var list = parseArtistData(data);
+    if (list.length > 0) return list; 
+    return fallbackToSongSearch();   
+  }).catch(function () {
+    return fetch("/api/search?term=" + encodeURIComponent(term) + "&entity=musicArtist")
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        var list = parseArtistData(data);
+        if (list.length > 0) return list;
+        return fallbackToSongSearch();
       })
-      .then(parse)
-      .catch(function (e2) {
-        console.warn("Functions 代理失败，降级到公共 CORS 代理:", e2);
-        return new Promise(function (resolve, reject) {
-          GM.fetchJson(GM.CORS_PROXY + encodeURIComponent(targetUrl), function (err, data) {
-            if (err) { reject(err); return; }
-            resolve(parse(data));
-          });
-        });
+      .catch(function () {
+        return fallbackToSongSearch();
       });
   });
 };
@@ -241,8 +294,8 @@ GM.handleBrawlSongs = function (artistId, artistName, data) {
 
 /* ===== V3.0.2优化 歌曲大乱斗：按歌手名搜索歌曲 ===== */
 GM.fetchArtistSongsById = function (artistId, artistName) {
-  // 【修复】移除 &attribute=artistTerm
-  var query = "/search?term=" + encodeURIComponent(artistName) + "&entity=song&limit=200&country=CN";
+  // 【核心修复】：追加 &lang=zh_cn，保证拉歌全链路不带英文
+  var query = "/search?term=" + encodeURIComponent(artistName) + "&entity=song&attribute=artistTerm&limit=200&country=CN&lang=zh_cn";
   var targetUrl = GM.BASE_URL + query;
 
   function parse(data) {

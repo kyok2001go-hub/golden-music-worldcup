@@ -14,12 +14,11 @@ export async function onRequest(context) {
   let targetUrl;
   const searchKW = term || artistId;
 
-  if (entity === 'artist_candidate') {
-    // 【核心修复】：大乱斗搜歌手，彻底废弃 musicArtist，改为搜歌 (entity=song)，限制30首足够提取出歌手
-    targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(searchKW)}&entity=song&limit=30&country=CN`;
+  if (entity === 'musicArtist') {
+    targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(searchKW)}&entity=musicArtist&attribute=artistTerm&limit=10&country=CN&lang=zh_cn`;
   } else {
-    // 【核心修复】：获取歌单时，彻底移除 &attribute=artistTerm，最大程度防止苹果漏抓
-    targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(searchKW)}&entity=song&limit=200&country=CN`;
+    // 【核心修复】：为所有的歌曲级别搜索也补上 lang=zh_cn，防止语言漂移
+    targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(searchKW)}&entity=song&attribute=artistTerm&limit=200&country=CN&lang=zh_cn`;
   }
 
   try {
