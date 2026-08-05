@@ -111,7 +111,8 @@ GM.handleSongs = function (name, data) {
 
 /* ===== 核心获取歌手歌曲（单歌手模式） ===== */
 GM.coreFetchArtist = function (name, onSuccess, onFail) {
-  var query = "/search?term=" + encodeURIComponent(name) + "&entity=song&attribute=artistTerm&limit=200&country=CN";
+  // 【修复】移除 &attribute=artistTerm
+  var query = "/search?term=" + encodeURIComponent(name) + "&entity=song&limit=200&country=CN";
   var targetUrl = GM.BASE_URL + query;
   
   function onData(data) {
@@ -137,8 +138,7 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
     });
 
   function tryFunctionsProxy() {
-    var apiUrl = "/api/search?term=" + encodeURIComponent(name);
-    fetch(apiUrl)
+    fetch("/api/search?term=" + encodeURIComponent(name))
       .then(function(res) {
         if (!res.ok) throw new Error("Functions API Error");
         return res.json();
@@ -160,10 +160,10 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
   }
 };
 
-/* ===== V3.0.2优化 歌曲大乱斗：歌手候选搜索（entity=musicArtist，带 &lang=zh_cn） ===== */
+/* ===== V3.0.3终极优化 歌曲大乱斗：废弃歌手接口，从歌曲里提取歌手 ===== */
 GM.fetchArtistCandidates = function (term) {
-  // 【修复】：移除 &attribute=artistTerm，放宽匹配条件
-  var query = "/search?term=" + encodeURIComponent(term) + "&entity=musicArtist&limit=10&country=CN&lang=zh_cn";
+  // 【核心修复】不搜歌手了，直接搜歌（entity=song），绕开苹果残缺的歌手库索引
+  var query = "/search?term=" + encodeURIComponent(term) + "&entity=song&limit=30&country=CN";
   var targetUrl = GM.BASE_URL + query;
 
   function parse(data) {
@@ -174,6 +174,7 @@ GM.fetchArtistCandidates = function (term) {
       var it = results[i];
       if (!it || !it.artistId || !it.artistName) continue;
       var id = String(it.artistId);
+      // 利用歌曲中的 artistId 进行去重
       if (seen[id]) continue;
       seen[id] = 1;
       out.push({ artistId: id, artistName: it.artistName, genre: it.primaryGenreName || "" });
@@ -184,7 +185,8 @@ GM.fetchArtistCandidates = function (term) {
 
   return GM.get(targetUrl).then(parse).catch(function (e) {
     console.warn("歌手候选直连失败，启用 Functions 代理", e);
-    return fetch("/api/search?term=" + encodeURIComponent(term) + "&entity=musicArtist")
+    // 告知后端这次是要提取候选人
+    return fetch("/api/search?term=" + encodeURIComponent(term) + "&entity=artist_candidate")
       .then(function (res) {
         if (!res.ok) throw new Error("Functions API Error");
         return res.json();
@@ -237,9 +239,10 @@ GM.handleBrawlSongs = function (artistId, artistName, data) {
   return songs;
 };
 
-/* ===== V3.0.2优化 歌曲大乱斗：按歌手名搜索歌曲（走 /search 获得最多歌曲，与单歌手模式彻底一致） ===== */
+/* ===== V3.0.2优化 歌曲大乱斗：按歌手名搜索歌曲 ===== */
 GM.fetchArtistSongsById = function (artistId, artistName) {
-  var query = "/search?term=" + encodeURIComponent(artistName) + "&entity=song&attribute=artistTerm&limit=200&country=CN";
+  // 【修复】移除 &attribute=artistTerm
+  var query = "/search?term=" + encodeURIComponent(artistName) + "&entity=song&limit=200&country=CN";
   var targetUrl = GM.BASE_URL + query;
 
   function parse(data) {
@@ -252,7 +255,6 @@ GM.fetchArtistSongsById = function (artistId, artistName) {
     return songs;
   }).catch(function (e) {
     console.warn("大乱斗直连获取歌曲失败，启用 Functions 代理", e);
-    // 强制传 term=artistName 走 /search，杜绝走 lookup 精确接口
     return fetch("/api/search?term=" + encodeURIComponent(artistName))
       .then(function (res) {
         if (!res.ok) throw new Error("Functions API Error");
