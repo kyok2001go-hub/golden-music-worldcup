@@ -245,7 +245,9 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
 
 .vs-card-name {
   font-size: 16px; font-weight: 700; color: #f0f1f8; margin-bottom: 24px; min-height: 44px;
-  display: flex; align-items: center; justify-content: center; word-break: break-all; line-height: 1.4;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
+  overflow: hidden; word-break: break-all; line-height: 1.4; text-overflow: ellipsis;
+  align-items: center; justify-content: center; text-align: center;
 }
 
 .vs-card.picked .vs-card-name { color: var(--theme-btn-primary, #c498ff); }
@@ -350,12 +352,13 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
   position: relative;
 }
 
+/* CD机喇叭圆点透明度加深50%：0.15 → 0.225 */
 .cd-player-wrapper .speaker {
   width: 28%;
   height: 100%;
-  background-color: var(--theme-btn-primary, #383958); 
-  background-image: radial-gradient(rgba(0, 0, 0, 0.15) 25%, transparent 25%); 
-  background-size: 0.7cqw 0.7cqw; 
+  background-color: var(--theme-btn-primary, #383958);
+  background-image: radial-gradient(rgba(0, 0, 0, 0.225) 25%, transparent 25%);
+  background-size: 0.7cqw 0.7cqw;
   background-position: center;
   box-shadow: inset 0 0 2cqw rgba(0,0,0,0.1);
 }
@@ -634,11 +637,18 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
   border-radius: 8px; padding: 8px 32px 8px 12px; color: #fff; outline: none; transition: border 0.2s;
 }
 .select-search input:focus { border-color: var(--theme-btn-primary, #5b6fc4); }
-.select-search-clear { 
-  position: absolute; right: 10px; top: 50%; transform: translateY(-50%); 
-  color: rgba(255,255,255,0.6); cursor: pointer; font-size: 14px; padding: 4px; 
+.select-search-clear {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  cursor: pointer;
+  width: 20px; height: 20px;
+  transition: opacity 0.15s, transform 0.1s;
 }
-.select-search-clear:hover { color: #fff; }
+.select-search-clear svg {
+  width: 100%; height: 100%;
+  display: block;
+}
+.select-search-clear:hover { opacity: 0.8; }
+.select-search-clear:active { transform: translateY(-50%) scale(0.92); }
 
 /* 排序与清空纯文字工具栏 */
 .select-sub-tools { 
@@ -677,10 +687,10 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
 
 /* 卡片样式，Flex布局 */
 .select-card {
-  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; 
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
   padding: 12px; cursor: pointer; position: relative; transition: all 0.15s; user-select: none;
   display: flex; flex-direction: column; justify-content: space-between;
-  min-height: 84px;
+  min-height: 96px;
 }
 /* V2.3.4: 选中态取消背景色变化，边框使用提亮后的开始对阵色，并去除阴影(box-shadow) */
 .select-card.selected { 
@@ -746,7 +756,7 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
 /* 移动端全屏自适应及 3列 高密度排版优化 */
 @media (max-width: 640px) {
   .select-box { height: 100%; max-height: 100vh; border-radius: 0; border: none; }
-  .select-body { grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 12px; }
+  .select-body { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px; }
   .select-card { padding: 10px; min-height: 74px; }
   .sel-name { font-size: 12px; line-height: 1.35; margin-bottom: 6px;}
   .sel-year { font-size: 10px; }
@@ -879,7 +889,7 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
 .brawl-artist-list:empty { display: none; }
 .brawl-artist-row {
   display: flex; align-items: center; justify-content: space-between;
-  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.16);
   border-radius: 8px; padding: 12px 14px; animation: menu-scale-in 0.18s cubic-bezier(0.18, 0.89, 0.32, 1.28);
 }
 .brawl-artist-row .row-name { color: #f0f1f8; font-size: 14.5px; font-weight: 600; }
@@ -906,7 +916,7 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
 .brawl-status.err { color: #ff8a7e; }
 .brawl-status.ok { color: #6fdc9c; }
 
-.brawl-btn-next { padding: 12px 64px; font-size: 15.5px; font-weight: 700; letter-spacing: 2px; }
+.brawl-btn-next { width: 100%; padding: 12px 20px; font-size: 15.5px; font-weight: 700; letter-spacing: 2px; }
 .brawl-btn-next:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* 挑歌视图顶部右侧关闭按钮 */
@@ -981,7 +991,7 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
 .seed-wrap input.locked { cursor: default; color: rgba(240,241,248,.85); }
 
 @media (max-width: 640px) {
-  .brawl-pick-body { grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 10px 2px 16px; }
+  .brawl-pick-body { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 10px 2px 16px; }
   .brawl-pick-box { padding: 0 12px; }
   .brawl-pick-foot .select-btn-rand, .brawl-pick-foot .select-btn-submit { min-width: 0; }
 }

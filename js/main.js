@@ -1289,7 +1289,7 @@ var GM = window.GM = window.GM || {};
     GM.save();
     GM.switchTab("quick");
     GM.render();
-    GM.toast("挑歌进度已保存，可从「歌曲大乱斗」入口继续", 2000);
+    GM.toast("挑歌进度已保存，可从首页入口继续", 2000);
   });
   document.getElementById("brawlClose").addEventListener("click", function () {
     if (brawlFetching) return;
@@ -1351,6 +1351,7 @@ var GM = window.GM = window.GM || {};
 
     brawlFetching = true;
     brawlBtnNext.disabled = true;
+    brawlBtnNext.style.letterSpacing = "0";
     hideBrawlDropdown();
     var failName = "";
     var newPool = {};
@@ -1362,10 +1363,10 @@ var GM = window.GM = window.GM || {};
         // 已抓取过的歌手直接复用本地缓存，避免重复请求
         if (b.pool[a.artistId] && b.pool[a.artistId].length > 0) {
           newPool[a.artistId] = b.pool[a.artistId];
-          setBrawlStatus("（" + (i + 1) + "/" + b.artists.length + "）「" + a.artistName + "」歌曲已就绪…");
+          brawlBtnNext.textContent = "（" + (i + 1) + "/" + b.artists.length + "）「" + a.artistName + "」歌曲已就绪…";
           continue;
         }
-        setBrawlStatus("（" + (i + 1) + "/" + b.artists.length + "）正在抓取「" + a.artistName + "」的歌曲…");
+        brawlBtnNext.textContent = "（" + (i + 1) + "/" + b.artists.length + "）正在抓取「" + a.artistName + "」的歌曲…";
         var songs = await GM.fetchArtistSongsById(a.artistId, a.artistName);
         var ids = [];
         for (var s = 0; s < songs.length; s++) {
@@ -1391,11 +1392,12 @@ var GM = window.GM = window.GM || {};
       openBrawlPickView();
     } catch (e) {
       console.warn("大乱斗歌曲抓取失败:", e);
-      setBrawlStatus("");
       GM.toast("「" + failName + "」歌曲抓取失败，请检查网络后重试", 2500);
     } finally {
       brawlFetching = false;
       brawlBtnNext.disabled = false;
+      brawlBtnNext.textContent = "下一步";
+      brawlBtnNext.style.letterSpacing = "";
     }
   });
 
@@ -1420,8 +1422,14 @@ var GM = window.GM = window.GM || {};
     var html = "";
     for (var i = 0; i < b.artists.length; i++) {
       var a = b.artists[i];
+      // 统计该歌手已勾选的歌曲数量
+      var poolIds = b.pool[a.artistId] || [];
+      var count = 0;
+      for (var j = 0; j < poolIds.length; j++) {
+        if (b.selected.indexOf(poolIds[j]) !== -1) count++;
+      }
       html += '<button class="brawl-tab' + (a.artistId === currentBrawlTab ? " active" : "") +
-        '" data-id="' + GM.esc(a.artistId) + '">' + GM.esc(a.artistName) + '</button>';
+        '" data-id="' + GM.esc(a.artistId) + '">' + GM.esc(a.artistName) + ' · ' + count + '</button>';
     }
     brawlTabs.innerHTML = html;
   }
@@ -1519,6 +1527,7 @@ var GM = window.GM = window.GM || {};
       card.classList.add("selected");
     }
     GM.save(); // 每次勾选立即固化，支持断点恢复
+    renderBrawlTabs(); // 更新 tab 上的已选数量
     updateBrawlFooter();
   });
 
@@ -1542,6 +1551,7 @@ var GM = window.GM = window.GM || {};
     b.selected = b.selected.filter(function (id) { return !idSet[id]; });
     if (b.selected.length === before) { GM.toast("当前歌手暂无勾选"); return; }
     GM.save();
+    renderBrawlTabs(); // 更新 tab 上的已选数量
     renderBrawlList();
     GM.toast("已清空当前歌手的勾选");
   });
@@ -1569,6 +1579,7 @@ var GM = window.GM = window.GM || {};
     }
     b.selected = otherSelected.concat(poolIds.slice(0, allowed));
     GM.save();
+    renderBrawlTabs(); // 更新 tab 上的已选数量
     renderBrawlList();
     GM.toast("已为当前歌手随机抽取 " + allowed + " 首");
   });
