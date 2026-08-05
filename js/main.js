@@ -1589,12 +1589,8 @@ var GM = window.GM = window.GM || {};
     var b = GM.state.brawl;
     if (b.selected.length !== b.size) return;
 
-    // 1. 数据转换与洗牌
-    var arr = b.selected.slice();
-    for (var k = arr.length - 1; k > 0; k--) {
-      var j = Math.floor(Math.random() * (k + 1));
-      var tmp = arr[k]; arr[k] = arr[j]; arr[j] = tmp;
-    }
+    // 1. 数据转换与洗牌（V3.1：完全随机 + 冲突解决，尽量避免首轮同歌手内战）
+    var arr = GM.shuffleBrawl(b.selected);
 
     // 2. 赛制与对阵树重置
     if (GM.state.size !== b.size) {
@@ -1755,9 +1751,15 @@ var GM = window.GM = window.GM || {};
       return;
     }
     var arr = filled.slice();
-    for (var k = arr.length - 1; k > 0; k--) {
-      var j = Math.floor(Math.random() * (k + 1));
-      var tmp = arr[k]; arr[k] = arr[j]; arr[j] = tmp;
+    if (GM.state.brawl && GM.state.brawl.active) {
+      // 大乱斗模式：完全随机 + 冲突解决，首轮尽量避免同歌手内战
+      arr = GM.shuffleBrawl(arr);
+    } else {
+      // 单歌手模式：保持原有纯 Fisher-Yates 洗牌
+      for (var k = arr.length - 1; k > 0; k--) {
+        var j = Math.floor(Math.random() * (k + 1));
+        var tmp = arr[k]; arr[k] = arr[j]; arr[j] = tmp;
+      }
     }
     var next = new Array(GM.seeds()).fill("");
     for (var m = 0; m < arr.length && m < GM.seeds(); m++) next[m] = arr[m];
