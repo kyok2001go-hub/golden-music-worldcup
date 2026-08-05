@@ -1,5 +1,5 @@
 export async function onRequest(context) {
-  // 1. 获取前端传过来的参数啊啊123
+  // 1. 获取前端传过来的参数
   const url = new URL(context.request.url);
   const term = url.searchParams.get('term');
   const artistId = url.searchParams.get('artistId');
@@ -14,15 +14,13 @@ export async function onRequest(context) {
 
   // 2. 拼接 iTunes 真实的请求地址
   let targetUrl;
-  if (artistId) {
-    // 歌曲大乱斗：按 artistId 精确查询该歌手的歌曲（lookup 接口）
-    targetUrl = `https://itunes.apple.com/lookup?id=${encodeURIComponent(artistId)}&entity=song&limit=200&country=CN`;
-  } else if (entity === 'musicArtist') {
-    // 歌曲大乱斗：歌手候选搜索（entity=musicArtist 精确匹配歌手/艺术家）
-    targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=musicArtist&attribute=artistTerm&limit=10&country=CN`;
+  if (entity === 'musicArtist') {
+    // 歌手候选搜索：强制带上 &lang=zh_cn 确保苹果接口返回简体中文歌手名
+    targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=musicArtist&attribute=artistTerm&limit=10&country=CN&lang=zh_cn`;
   } else {
-    // 默认：带上 attribute=artistTerm 精准匹配歌手热歌
-    targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=song&attribute=artistTerm&limit=200&country=CN&media=music`;
+    // 歌曲大乱斗 & 单歌手模式统一：使用 /search 模糊搜索，不加 media=music，不加 lookup，确保获取最多歌曲（166首）
+    const searchKW = term || artistId;
+    targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(searchKW)}&entity=song&attribute=artistTerm&limit=200&country=CN`;
   }
 
   try {

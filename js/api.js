@@ -109,7 +109,7 @@ GM.handleSongs = function (name, data) {
   return { songs: songs, metaData: metaData };
 };
 
-/* ===== 核心获取歌手歌曲 ===== */
+/* ===== 核心获取歌手歌曲（单歌手模式） ===== */
 GM.coreFetchArtist = function (name, onSuccess, onFail) {
   var query = "/search?term=" + encodeURIComponent(name) + "&entity=song&attribute=artistTerm&limit=200&country=CN";
   var targetUrl = GM.BASE_URL + query;
@@ -160,9 +160,9 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
   }
 };
 
-/* ===== V3.0 歌曲大乱斗：歌手候选搜索（entity=musicArtist） ===== */
+/* ===== V3.0.2优化 歌曲大乱斗：歌手候选搜索（entity=musicArtist，带 &lang=zh_cn） ===== */
 GM.fetchArtistCandidates = function (term) {
-  var query = "/search?term=" + encodeURIComponent(term) + "&entity=musicArtist&attribute=artistTerm&limit=10&country=CN";
+  var query = "/search?term=" + encodeURIComponent(term) + "&entity=musicArtist&attribute=artistTerm&limit=10&country=CN&lang=zh_cn";
   var targetUrl = GM.BASE_URL + query;
 
   function parse(data) {
@@ -201,7 +201,7 @@ GM.fetchArtistCandidates = function (term) {
   });
 };
 
-/* ===== V3.0 歌曲大乱斗：解析某歌手的完整歌单（按 artistId 精确查询） ===== */
+/* ===== V3.0.2优化 歌曲大乱斗：解析某歌手的完整歌单 ===== */
 GM.handleBrawlSongs = function (artistId, artistName, data) {
   var results = (data && data.results) || [];
   var seen = {};
@@ -209,12 +209,13 @@ GM.handleBrawlSongs = function (artistId, artistName, data) {
 
   for (var i = 0; i < results.length; i++) {
     var it = results[i];
-    // lookup 接口首条为歌手本体，需剔除；仅保留歌曲条目
     if (!it || it.wrapperType !== "track" || it.kind !== "song") continue;
     if (!it.trackId || !it.trackName) continue;
+    
     var track = (it.trackName || "").replace(/^\s+|\s+$/g, "");
     if (!track) continue;
     if (/(live|remix|acoustic)/i.test(track)) continue;
+
     var key = track.toLowerCase();
     if (seen[key]) continue;
     seen[key] = 1;
@@ -222,7 +223,7 @@ GM.handleBrawlSongs = function (artistId, artistName, data) {
     songs.push({
       trackId: String(it.trackId),
       trackName: track,
-      artistId: String(it.artistId || artistId),
+      artistId: String(artistId),
       artistName: it.artistName || artistName || "",
       collectionName: it.collectionName || "",
       releaseDate: it.releaseDate || "",
@@ -235,9 +236,9 @@ GM.handleBrawlSongs = function (artistId, artistName, data) {
   return songs;
 };
 
-/* ===== V3.0 歌曲大乱斗：按 artistId 抓取歌曲（Promise 风格，供串行队列 await） ===== */
+/* ===== V3.0.2优化 歌曲大乱斗：按歌手名搜索歌曲（走 /search 获得最多歌曲，与单歌手模式彻底一致） ===== */
 GM.fetchArtistSongsById = function (artistId, artistName) {
-  var query = "/lookup?id=" + encodeURIComponent(artistId) + "&entity=song&limit=200&country=CN";
+  var query = "/search?term=" + encodeURIComponent(artistName) + "&entity=song&attribute=artistTerm&limit=200&country=CN";
   var targetUrl = GM.BASE_URL + query;
 
   function parse(data) {
@@ -249,8 +250,9 @@ GM.fetchArtistSongsById = function (artistId, artistName) {
     if (songs.length === 0) throw new Error("EMPTY");
     return songs;
   }).catch(function (e) {
-    console.warn("按 artistId 直连失败，启用 Functions 代理", e);
-    return fetch("/api/search?artistId=" + encodeURIComponent(artistId))
+    console.warn("大乱斗直连获取歌曲失败，启用 Functions 代理", e);
+    // 强制传 term=artistName 走 /search，杜绝走 lookup 精确接口
+    return fetch("/api/search?term=" + encodeURIComponent(artistName))
       .then(function (res) {
         if (!res.ok) throw new Error("Functions API Error");
         return res.json();
