@@ -16,7 +16,8 @@ export async function onRequest(context) {
   let targetUrl;
   if (entity === 'musicArtist') {
     // 歌手候选搜索：强制带上 &lang=zh_cn 确保苹果接口返回简体中文歌手名
-    targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=musicArtist&attribute=artistTerm&limit=10&country=CN&lang=zh_cn`;
+    // 【修复】：移除 &attribute=artistTerm，放宽匹配条件，解决搜不到“萧亚轩”等歌手的问题
+    targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=musicArtist&limit=10&country=CN&lang=zh_cn`;
   } else {
     // 歌曲大乱斗 & 单歌手模式统一：使用 /search 模糊搜索，不加 media=music，不加 lookup，确保获取最多歌曲（166首）
     const searchKW = term || artistId;

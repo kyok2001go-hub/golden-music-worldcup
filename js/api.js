@@ -162,7 +162,8 @@ GM.coreFetchArtist = function (name, onSuccess, onFail) {
 
 /* ===== V3.0.2优化 歌曲大乱斗：歌手候选搜索（entity=musicArtist，带 &lang=zh_cn） ===== */
 GM.fetchArtistCandidates = function (term) {
-  var query = "/search?term=" + encodeURIComponent(term) + "&entity=musicArtist&attribute=artistTerm&limit=10&country=CN&lang=zh_cn";
+  // 【修复】：移除 &attribute=artistTerm，放宽匹配条件
+  var query = "/search?term=" + encodeURIComponent(term) + "&entity=musicArtist&limit=10&country=CN&lang=zh_cn";
   var targetUrl = GM.BASE_URL + query;
 
   function parse(data) {
