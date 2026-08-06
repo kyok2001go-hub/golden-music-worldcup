@@ -407,6 +407,22 @@
   </div>
 </div>
 
+<div class="modal-mask deep-search-mask" id="deepSearchMask">
+  <div class="modal deep-search-modal">
+    <div class="modal-head">
+      <span>歌曲深度搜索</span>
+      <span class="modal-close" id="deepSearchClose" title="关闭">✕</span>
+    </div>
+    <div class="modal-body deep-search-body">
+      <div class="deep-search-input-wrap">
+        <input type="text" id="deepSearchInput" placeholder="输入歌名搜索..." autocomplete="off">
+        <span class="select-search-clear" id="deepSearchClear" style="display:none;" title="清空"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="rgba(255,255,255,0.2)"/><path d="M15 9l-6 6M9 9l6 6" stroke="rgba(255,255,255,0.8)" stroke-width="2" stroke-linecap="round"/></svg></span>
+      </div>
+      <div class="deep-search-list" id="deepSearchList"></div>
+    </div>
+  </div>
+</div>
+
 <script src="js/state.js"></script>
 <script src="js/api.js"></script>
 <script src="js/theme.js"></script>

@@ -352,3 +352,73 @@ GM.extractCoversFromApiRes = function (res) {
   }
   return allCovers.slice(0, 8);
 };
+
+/* ===== V3.1.2 歌曲深度搜索：结合歌手名与关键词再次请求 API ===== */
+GM.deepSearchSongs = function (artistName, keyword) {
+  var kw = (keyword || "").replace(/^\s+|\s+$/g, "");
+  var name = (artistName || "").replace(/^\s+|\s+$/g, "");
+  if (!kw) return Promise.resolve([]);
+
+  var term = name ? (name + " " + kw) : kw;
+  var query = "/search?term=" + encodeURIComponent(term) + "&entity=song&limit=50&country=CN&lang=zh_cn";
+  var targetUrl = GM.BASE_URL + query;
+
+  function parseResults(data) {
+    var results = (data && data.results) || [];
+    var list = [];
+    var seen = {};
+    for (var i = 0; i < results.length; i++) {
+      var it = results[i];
+      if (!it || !it.trackName) continue;
+      var track = (it.trackName || "").replace(/^\s+|\s+$/g, "");
+      if (!track) continue;
+
+      var tid = String(it.trackId || (track + "_" + i));
+      if (seen[tid]) continue;
+      seen[tid] = 1;
+
+      list.push({
+        trackId: String(it.trackId || ""),
+        trackName: track,
+        artistName: it.artistName || name || "",
+        collectionName: it.collectionName || "",
+        releaseDate: it.releaseDate || "",
+        artworkUrl100: it.artworkUrl100 || "",
+        previewUrl: it.previewUrl || "",
+        source: 'api'
+      });
+    }
+    return list;
+  }
+
+  function fetchPrimary() {
+    return GM.get(targetUrl).then(function (data) {
+      var res = parseResults(data);
+      if (res.length === 0 && name) {
+        // 若带歌手名搜索结果为空，降级仅用关键词再次检索
+        var fallbackUrl = GM.BASE_URL + "/search?term=" + encodeURIComponent(kw) + "&entity=song&limit=50&country=CN&lang=zh_cn";
+        return GM.get(fallbackUrl).then(parseResults).catch(function() { return []; });
+      }
+      return res;
+    }).catch(function (e) {
+      console.warn("深度搜索直连失败，尝试 Functions 代理", e);
+      return fetch("/api/search?term=" + encodeURIComponent(term))
+        .then(function (res) {
+          if (!res.ok) throw new Error("Functions API Error");
+          return res.json();
+        })
+        .then(parseResults)
+        .catch(function (e2) {
+          console.warn("Functions 代理失败，降级 CORS 代理", e2);
+          return new Promise(function (resolve, reject) {
+            GM.fetchJson(GM.CORS_PROXY + encodeURIComponent(targetUrl), function (err, data) {
+              if (err) { reject(err); return; }
+              resolve(parseResults(data));
+            });
+          });
+        });
+    });
+  }
+
+  return fetchPrimary();
+};

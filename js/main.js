@@ -1159,7 +1159,17 @@ var GM = window.GM = window.GM || {};
       html += '</div>';
     }
     
-    selectBody.innerHTML = html || '<div style="color: rgba(255,255,255,0.4); text-align: center; grid-column: 1/-1; padding-top: 40px;">暂无匹配歌曲</div>';
+    if (!html) {
+      if (kw) {
+        html = '<div class="deep-search-empty-box">' +
+          '<div class="deep-search-empty-text">没找到你要的歌曲？试试深度搜索</div>' +
+          '<button class="btn-deep-search-trigger" id="btnSelectDeepSearch">深度搜索</button>' +
+          '</div>';
+      } else {
+        html = '<div style="color: rgba(255,255,255,0.4); text-align: center; grid-column: 1/-1; padding-top: 40px;">暂无匹配歌曲</div>';
+      }
+    }
+    selectBody.innerHTML = html;
     
     if (tempSelectedSongs.length < currentSelectSize) {
       selectBtnSubmit.disabled = true;
@@ -1171,6 +1181,11 @@ var GM = window.GM = window.GM || {};
   }
 
   selectBody.addEventListener("click", function(e) {
+    var deepBtn = e.target.closest ? e.target.closest("#btnSelectDeepSearch") : null;
+    if (deepBtn) {
+      openDeepSearchModal("single", selectSearchInput.value.trim());
+      return;
+    }
     var card = e.target.closest(".select-card");
     if (!card) return;
     var s = card.getAttribute("data-song");
@@ -1588,7 +1603,17 @@ var GM = window.GM = window.GM || {};
         '</div></div>';
     }
 
-    brawlBody.innerHTML = html || '<div style="color: rgba(255,255,255,0.4); text-align: center; grid-column: 1/-1; padding-top: 40px;">暂无匹配歌曲</div>';
+    if (!html) {
+      if (kw) {
+        html = '<div class="deep-search-empty-box">' +
+          '<div class="deep-search-empty-text">没找到你要的歌曲？试试深度搜索</div>' +
+          '<button class="btn-deep-search-trigger" id="btnBrawlDeepSearch">深度搜索</button>' +
+          '</div>';
+      } else {
+        html = '<div style="color: rgba(255,255,255,0.4); text-align: center; grid-column: 1/-1; padding-top: 40px;">暂无匹配歌曲</div>';
+      }
+    }
+    brawlBody.innerHTML = html;
     updateBrawlFooter();
   }
 
@@ -1603,6 +1628,11 @@ var GM = window.GM = window.GM || {};
   });
 
   brawlBody.addEventListener("click", function (e) {
+    var deepBtn = e.target.closest ? e.target.closest("#btnBrawlDeepSearch") : null;
+    if (deepBtn) {
+      openDeepSearchModal("brawl", brawlSearchInput.value.trim());
+      return;
+    }
     var card = e.target.closest ? e.target.closest(".select-card") : null;
     if (!card) return;
     var tid = card.getAttribute("data-tid");
@@ -2007,5 +2037,213 @@ var GM = window.GM = window.GM || {};
       }
     }
   }
+
+  /* ===== V3.1.2 歌曲深度搜索逻辑（兼顾单歌手模式与大乱斗模式） ===== */
+  var deepSearchMask = document.getElementById("deepSearchMask");
+  var deepSearchInput = document.getElementById("deepSearchInput");
+  var deepSearchClear = document.getElementById("deepSearchClear");
+  var deepSearchList = document.getElementById("deepSearchList");
+  var deepSearchClose = document.getElementById("deepSearchClose");
+
+  var deepSearchMode = "single"; // "single" | "brawl"
+  var deepSearchTimer = null;
+  var deepSearchSeq = 0;
+  var currentDeepSearchArtistName = "";
+  var currentDeepSearchResults = [];
+
+  function getSingleArtistName() {
+    if (GM.state.allFetchedSongs && GM.state.allFetchedSongs.length > 0) {
+      var m = GM.state.meta[GM.state.allFetchedSongs[0]];
+      if (m && m.artistName) return m.artistName;
+    }
+    return GM.state.title || "";
+  }
+
+  function getBrawlArtistName() {
+    var b = GM.state.brawl;
+    if (!currentBrawlTab) return "";
+    for (var i = 0; i < b.artists.length; i++) {
+      if (b.artists[i].artistId === currentBrawlTab) return b.artists[i].artistName;
+    }
+    return "";
+  }
+
+  function openDeepSearchModal(mode, initialKw) {
+    deepSearchMode = mode;
+    if (mode === "single") {
+      currentDeepSearchArtistName = getSingleArtistName();
+    } else {
+      currentDeepSearchArtistName = getBrawlArtistName();
+    }
+    deepSearchInput.value = initialKw || "";
+    deepSearchClear.style.display = deepSearchInput.value ? "block" : "none";
+    deepSearchMask.classList.add("show");
+    deepSearchInput.focus();
+
+    doDeepSearch();
+  }
+
+  function closeDeepSearchModal() {
+    deepSearchMask.classList.remove("show");
+    if (deepSearchMode === "single") {
+      renderSelectList();
+    } else if (deepSearchMode === "brawl") {
+      renderBrawlList();
+      renderBrawlTabs();
+    }
+  }
+
+  function isSongInPool(item) {
+    if (deepSearchMode === "single") {
+      var songStr = (item.trackName || "").slice(0, 30);
+      return (GM.state.allFetchedSongs || []).indexOf(songStr) !== -1;
+    } else if (deepSearchMode === "brawl") {
+      var pool = (GM.state.brawl.pool && GM.state.brawl.pool[currentBrawlTab]) || [];
+      var tid = String(item.trackId || "");
+      if (tid && pool.indexOf(tid) !== -1) return true;
+      var kwTrack = (item.trackName || "").toLowerCase();
+      return pool.some(function(id) {
+        var m = GM.state.meta[id];
+        return m && m.trackName && m.trackName.toLowerCase() === kwTrack;
+      });
+    }
+    return false;
+  }
+
+  function renderDeepSearchResults(list) {
+    currentDeepSearchResults = list;
+    if (!list || list.length === 0) {
+      deepSearchList.innerHTML = '<div class="ds-status-tip">未搜索到相关歌曲，请换个关键词试试</div>';
+      return;
+    }
+
+    var html = "";
+    for (var i = 0; i < list.length; i++) {
+      var item = list[i];
+      var added = isSongInPool(item);
+      var artistDisp = item.artistName || currentDeepSearchArtistName;
+      if (item.collectionName) {
+        artistDisp += " · " + item.collectionName;
+      }
+      html += '<div class="deep-search-card" data-idx="' + i + '">' +
+        '<div class="ds-card-info">' +
+        '<div class="ds-card-title" title="' + GM.esc(item.trackName) + '">' + GM.esc(item.trackName) + '</div>' +
+        '<div class="ds-card-artist" title="' + GM.esc(artistDisp) + '">' + GM.esc(artistDisp) + '</div>' +
+        '</div>' +
+        '<button class="ds-card-add' + (added ? " added" : "") + '" title="' + (added ? "已在列表中" : "添加") + '">' + (added ? "✓" : "+") + '</button>' +
+        '</div>';
+    }
+    deepSearchList.innerHTML = html;
+  }
+
+  function doDeepSearch() {
+    var kw = deepSearchInput.value.replace(/^\s+|\s+$/g, "");
+    if (!kw) {
+      deepSearchList.innerHTML = '<div class="ds-status-tip">请输入歌名进行深度搜索</div>';
+      return;
+    }
+    var seq = ++deepSearchSeq;
+    deepSearchList.innerHTML = '<div class="ds-status-tip">正在深度搜索中…</div>';
+
+    GM.deepSearchSongs(currentDeepSearchArtistName, kw).then(function(list) {
+      if (seq !== deepSearchSeq) return;
+      renderDeepSearchResults(list);
+    }).catch(function(e) {
+      if (seq !== deepSearchSeq) return;
+      console.warn("深度搜索发生错误:", e);
+      deepSearchList.innerHTML = '<div class="ds-status-tip">深度搜索失败，请检查网络后重试</div>';
+    });
+  }
+
+  function addSongToPool(item) {
+    if (isSongInPool(item)) {
+      GM.toast("已在列表中");
+      return false;
+    }
+
+    if (deepSearchMode === "single") {
+      var songStr = (item.trackName || "").slice(0, 30);
+      GM.state.allFetchedSongs.push(songStr);
+      GM.state.meta[songStr] = {
+        trackName: item.trackName,
+        artistName: item.artistName || currentDeepSearchArtistName || "",
+        collectionName: item.collectionName || "",
+        releaseDate: item.releaseDate || "",
+        artworkUrl100: item.artworkUrl100 || "",
+        previewUrl: item.previewUrl || "",
+        source: 'api'
+      };
+      GM.save();
+      GM.toast("已添加至歌曲列表");
+      return true;
+    } else if (deepSearchMode === "brawl") {
+      if (!currentBrawlTab) {
+        GM.toast("添加失败：未知歌手ID");
+        return false;
+      }
+      var pool = GM.state.brawl.pool[currentBrawlTab] || [];
+      var tid = String(item.trackId || (item.trackName + "_" + Date.now()));
+      pool.push(tid);
+      GM.state.brawl.pool[currentBrawlTab] = pool;
+      GM.state.meta[tid] = {
+        trackId: tid,
+        trackName: item.trackName,
+        artistId: String(currentBrawlTab),
+        artistName: item.artistName || currentDeepSearchArtistName || "",
+        collectionName: item.collectionName || "",
+        releaseDate: item.releaseDate || "",
+        artworkUrl100: item.artworkUrl100 || "",
+        previewUrl: item.previewUrl || "",
+        source: 'api'
+      };
+      GM.save();
+      GM.toast("已添加至歌曲列表");
+      return true;
+    }
+    return false;
+  }
+
+  deepSearchList.addEventListener("click", function(e) {
+    var btn = e.target.closest ? e.target.closest(".ds-card-add") : null;
+    if (!btn) return;
+    var card = btn.closest(".deep-search-card");
+    if (!card) return;
+    var idx = +card.getAttribute("data-idx");
+    var item = currentDeepSearchResults[idx];
+    if (!item) return;
+
+    var ok = addSongToPool(item);
+    if (ok) {
+      btn.classList.add("added");
+      btn.textContent = "✓";
+      btn.title = "已在列表中";
+    }
+  });
+
+  deepSearchInput.addEventListener("input", function() {
+    deepSearchClear.style.display = this.value ? "block" : "none";
+    if (deepSearchTimer) clearTimeout(deepSearchTimer);
+    deepSearchTimer = setTimeout(doDeepSearch, 350);
+  });
+
+  deepSearchInput.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (deepSearchTimer) clearTimeout(deepSearchTimer);
+      doDeepSearch();
+    }
+  });
+
+  deepSearchClear.addEventListener("click", function() {
+    deepSearchInput.value = "";
+    this.style.display = "none";
+    deepSearchList.innerHTML = '<div class="ds-status-tip">请输入歌名进行深度搜索</div>';
+    deepSearchInput.focus();
+  });
+
+  deepSearchClose.addEventListener("click", closeDeepSearchModal);
+  deepSearchMask.addEventListener("click", function(e) {
+    if (e.target === deepSearchMask) closeDeepSearchModal();
+  });
 
 })();

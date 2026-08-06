@@ -216,12 +216,12 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
   transform: translateY(2vh);
 }
 .vs-close { position: absolute; top: 8px; right: 10px; z-index: 10; cursor: pointer; color: rgba(255,255,255,.5); font-size: 20px; padding: 6px 8px; line-height: 1; }
-.vs-close:hover { color: #fff; }
+@media (hover: hover) and (pointer: fine) { .vs-close:hover { color: #fff; } }
 
 /* V3.1.1 返回前一场：与右上角 ✕ 对称的左上角按钮 */
 .vs-back { position: absolute; top: 8px; left: 10px; z-index: 10; cursor: pointer; color: rgba(255,255,255,.5); font-size: 13px; padding: 6px 8px; line-height: 1; display: flex; align-items: center; gap: 3px; user-select: none; transition: color .15s; }
 .vs-back-icon { font-size: 20px; line-height: 1; transform: translateY(-1px); }
-.vs-back:hover { color: #fff; }
+@media (hover: hover) and (pointer: fine) { .vs-back:hover { color: #fff; } }
 
 .vs-title { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-size: 25px; font-weight: 800; color: #f0f1f8; text-align: center; letter-spacing: .5px; padding: 40px 16px 20px; }
 
@@ -1001,4 +1001,166 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
   .brawl-pick-body { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 10px 2px 16px; }
   .brawl-pick-box { padding: 0 12px; }
   .brawl-pick-foot .select-btn-rand, .brawl-pick-foot .select-btn-submit { min-width: 0; }
+}
+
+/* ===== V3.1.2 歌曲深度搜索样式 ===== */
+.deep-search-empty-box {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+.deep-search-empty-text {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 14.5px;
+  margin-bottom: 20px;
+  letter-spacing: 0.2px;
+}
+.btn-deep-search-trigger {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  padding: 10px 42px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-deep-search-trigger:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-1px);
+}
+.btn-deep-search-trigger:active {
+  transform: scale(0.96);
+}
+
+.deep-search-mask {
+  z-index: 2100;
+}
+.deep-search-modal {
+  height: 66.67vh;
+}
+.deep-search-body {
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+.deep-search-input-wrap {
+  position: relative;
+  width: 100%;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+.deep-search-input-wrap input {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 8px;
+  background: rgba(255,255,255,.06);
+  color: #f0f1f8;
+  padding: 16px 38px 16px 14px;
+  font-size: 15px;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.deep-search-input-wrap input:focus {
+  border-color: #5b6fc4; 
+  box-shadow: 0 0 0 2px rgba(91, 111, 196, .25);
+}
+.deep-search-input-wrap input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+.deep-search-input-wrap .select-search-clear {
+  top: 50%;
+  transform: translateY(-50%);
+  right: 12px;
+}
+.deep-search-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+.deep-search-card {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  transition: background 0.15s;
+}
+@media (hover: hover) and (pointer: fine) {
+  .deep-search-card:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+.ds-card-info {
+  flex: 1;
+  min-width: 0;
+}
+.ds-card-title {
+  font-size: 15.5px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ds-card-artist {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+}
+.ds-card-add {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  background: transparent;
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.ds-card-add:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: #fff;
+  transform: scale(1.08);
+}
+.ds-card-add:active {
+  transform: scale(0.92);
+}
+.ds-card-add.added {
+  border-color: var(--theme-btn-primary, #5b6fc4);
+  color: var(--theme-btn-primary, #5b6fc4);
+  background: rgba(255, 255, 255, 0.08);
+}
+.ds-status-tip {
+  color: rgba(255, 255, 255, 0.45);
+  text-align: center;
+  padding: 40px 0;
+  font-size: 14px;
 }
