@@ -69,6 +69,75 @@ GM.esc = function (s) {
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 };
 
+/* ===== V3.1 大乱斗随机分组：完全随机洗牌 + 冲突解决（Random Shuffle with Conflict Resolution） =====
+ * 目标：首轮对阵尽量避免同歌手内战，同时保留完全随机性让歌手间对阵组合多样化。
+ * 仅用于【歌曲大乱斗】模式；单歌手模式继续走普通 Fisher-Yates 洗牌。
+ * 流程：
+ *   1. Fisher-Yates 彻底洗牌（多样性基础）；
+ *   2. 逐对检测同歌手冲突，随机寻找「安全替补」交换（不引发新冲突）；
+ *   3. 多轮迭代扫尾（默认 5 遍），毫秒级开销；
+ *   4. 极端情况（如多数歌曲同属一个歌手）自然降级，保留理论最低内战率。
+ */
+GM.shuffleBrawl = function (arr, passes) {
+  var a = arr.slice();
+  var n = a.length;
+  if (n < 2) return a;
+
+  function artistKey(v) {
+    var m = GM.state.meta[v];
+    // 优先用 artistId，缺失时退回 artistName；无信息返回 null（不参与冲突判定）
+    if (m && m.artistId) return "i" + m.artistId;
+    if (m && m.artistName) return "n" + m.artistName;
+    return null;
+  }
+
+  // 1. 彻底的随机洗牌
+  for (var k = n - 1; k > 0; k--) {
+    var j = Math.floor(Math.random() * (k + 1));
+    var t = a[k]; a[k] = a[j]; a[j] = t;
+  }
+
+  // 预计算每首歌的歌手标识，避免迭代中反复查 meta
+  var keys = new Array(n);
+  for (var i = 0; i < n; i++) keys[i] = artistKey(a[i]);
+
+  // 2 & 3. 冲突检测与贪心置换，多轮迭代扫尾
+  var P = passes || 5;
+  for (var p = 0; p < P; p++) {
+    var anyConflict = false;
+    for (var g = 0; g + 1 < n; g += 2) {
+      var kA = keys[g], kB = keys[g + 1];
+      if (kA === null || kB === null || kA !== kB) continue;
+      anyConflict = true;
+
+      // 随机起点扫描其余对局，寻找安全替补
+      var total = n - 2;
+      if (total <= 0) break;
+      var start = Math.floor(Math.random() * total);
+      var found = false;
+      for (var c = 0; c < total && !found; c++) {
+        var idx = (start + c) % total;
+        if (idx >= g) idx += 2; // 跳过当前冲突对局本身
+        var partner = idx ^ 1;
+        var candKey = keys[idx];
+        if (candKey === null || candKey === kA) continue; // 条件1：替补不能是同歌手
+        // 条件2：把冲突方换入替补原对局后不能产生新内战
+        if (keys[partner] !== null && keys[partner] === kA) continue;
+
+        // 安全交换：a[idx] 进入冲突局替代 a[g]，a[g] 进入替补原局
+        var tmpSong = a[idx], tmpKey = keys[idx];
+        a[idx] = a[g]; keys[idx] = keys[g];
+        a[g] = tmpSong; keys[g] = tmpKey;
+        found = true;
+      }
+      // 找不到安全替补则保留内战（鸽巢原理下的理论最优降级）
+    }
+    if (!anyConflict) break; // 已无冲突，提前结束
+  }
+
+  return a;
+};
+
 /* ===== 显示名转义层：将 trackId 翻译为「歌曲名 (歌手名)」 ===== */
 /* withArtist === false 时仅返回歌曲名（用于对阵列表、导出图片等紧凑场景） */
 GM.getDisplayName = function (val, withArtist) {

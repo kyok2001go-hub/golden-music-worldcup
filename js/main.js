@@ -52,6 +52,41 @@ var GM = window.GM = window.GM || {};
     }
   };
 
+  /* ===== V3.1.1 按专辑排序：将歌曲按所属专辑分组，按专辑最早 releaseDate 从早到晚排列 ===== */
+  GM.sortByAlbum = function (list) {
+    // list 条目需包含 album（专辑名）、releaseDate（发行日期字符串）、originalIndex
+    var groups = [];
+    var groupMap = {};
+    for (var i = 0; i < list.length; i++) {
+      var it = list[i];
+      var key = it.album || "未知专辑";
+      if (!groupMap[key]) {
+        groupMap[key] = { name: key, items: [], minDate: "9999-99-99" };
+        groups.push(groupMap[key]);
+      }
+      var g = groupMap[key];
+      g.items.push(it);
+      if (it.releaseDate && it.releaseDate < g.minDate) g.minDate = it.releaseDate;
+    }
+    // 专辑组之间：最早发行的专辑排前面，无日期的排最后
+    groups.sort(function (a, b) {
+      if (a.minDate !== b.minDate) return a.minDate < b.minDate ? -1 : 1;
+      return a.name.localeCompare(b.name, "zh");
+    });
+    var out = [];
+    for (var gi = 0; gi < groups.length; gi++) {
+      // 组内：按歌曲自身发行日期从早到晚
+      groups[gi].items.sort(function (a2, b2) {
+        var da = a2.releaseDate || "9999-99-99";
+        var db = b2.releaseDate || "9999-99-99";
+        if (da !== db) return da < db ? -1 : 1;
+        return a2.originalIndex - b2.originalIndex;
+      });
+      for (var k = 0; k < groups[gi].items.length; k++) out.push(groups[gi].items[k]);
+    }
+    return out;
+  };
+
   /* ===== 自定义确认弹窗 ===== */
   var confirmMask = document.getElementById("confirmMask");
   var confirmMsg = document.getElementById("confirmMsg");
@@ -274,6 +309,26 @@ var GM = window.GM = window.GM || {};
     return null;
   }
 
+  /* ===== V3.1.1 返回前一场：按一二三轮正常次序找当前场次的前一场 ===== */
+  function findPrevMatch(fromR, fromI) {
+    if (fromI > 0) return { r: fromR, i: fromI - 1 };
+    if (fromR === 0) return null; // 已是第一场
+    var prevR = fromR - 1;
+    return { r: prevR, i: GM.state.winners[prevR].length - 1 };
+  }
+
+  function updateVsBackBtn() {
+    var btn = document.getElementById("vsBack");
+    if (!btn) return;
+    // 第一场时直接隐藏“返回前一场”入口
+    btn.style.display = (vsR === 0 && vsI === 0) ? "none" : "";
+  }
+
+  function setVsTitle(r, i) {
+    var roundNames = GM.SIZE_CONFIG[GM.seeds()].roundNames;
+    vsTitle.textContent = (r === GM.lastR()) ? "决赛" : (roundNames[r] + " · 第" + (i + 1) + "场");
+  }
+
   function findFirstUnplayedMatch() {
     for (var r = 0; r < GM.rounds(); r++) {
       for (var i = 0; i < GM.state.winners[r].length; i++) {
@@ -336,10 +391,10 @@ var GM = window.GM = window.GM || {};
   function openPopup(r, i, cellEl) {
     vsR = r; vsI = i;
     isPicking = false;
-    var roundNames = GM.SIZE_CONFIG[GM.seeds()].roundNames;
-    vsTitle.textContent = (r === GM.lastR()) ? "决赛" : (roundNames[r] + " · 第" + (i + 1) + "场");
+    setVsTitle(r, i);
     renderVsCards();
     updateVsProgress();
+    updateVsBackBtn();
     vsMask.classList.add("show");
     startVsTimer();
   }
@@ -363,10 +418,10 @@ var GM = window.GM = window.GM || {};
         var nxt = findNextMatch(vsR, vsI);
         if (nxt) {
           vsR = nxt.r; vsI = nxt.i;
-          var roundNames = GM.SIZE_CONFIG[GM.seeds()].roundNames;
-          vsTitle.textContent = (nxt.r === GM.lastR()) ? "决赛" : (roundNames[nxt.r] + " · 第" + (nxt.i + 1) + "场");
+          setVsTitle(nxt.r, nxt.i);
           renderVsCards();
           updateVsScreen();
+          updateVsBackBtn();
           isPicking = false;
           return;
         }
@@ -409,6 +464,26 @@ var GM = window.GM = window.GM || {};
     GM.stopPreview(); 
   });
   document.getElementById("vsClose").addEventListener("click", closePopup);
+
+  /* ===== V3.1.1 返回前一场：跳回上一场并清空其比赛结果（连带重置后续晋级链） ===== */
+  document.getElementById("vsBack").addEventListener("click", function () {
+    if (isPicking) return;
+    var prev = findPrevMatch(vsR, vsI);
+    if (!prev) { GM.toast("已经是第一场比赛了"); return; }
+    // 清空前一场的结果（clearNode 会级联重置依赖该胜者的后续场次）
+    if (GM.state.winners[prev.r][prev.i] !== null) {
+      GM.clearNode(prev.r, prev.i);
+    }
+    vsR = prev.r; vsI = prev.i;
+    setVsTitle(vsR, vsI);
+    GM.save(); GM.render();
+    GM.stopPreview();
+    renderVsCards();
+    updateVsProgress();
+    startVsTimer(); // 重置计时器并刷新场次屏显
+    updateVsBackBtn();
+  });
+
   vsMask.addEventListener("click", function (e) { if (e.target === vsMask) closePopup(); });
 
   /* ===== 比赛结果弹窗与回顾 ===== */
@@ -1036,7 +1111,7 @@ var GM = window.GM = window.GM || {};
       var meta = GM.state.meta[s] || {};
       var year = meta.releaseDate ? meta.releaseDate.substring(0, 4) : "未知";
       var sortYear = year === "未知" ? 9999 : parseInt(year);
-      listToRender.push({ name: s, year: year, sortYear: sortYear, originalIndex: i });
+      listToRender.push({ name: s, year: year, sortYear: sortYear, album: meta.collectionName || "", releaseDate: meta.releaseDate || "", originalIndex: i });
     }
     
     if (sortType === "asc") {
@@ -1053,13 +1128,22 @@ var GM = window.GM = window.GM || {};
         }
         return a.originalIndex - b.originalIndex;
       });
+    } else if (sortType === "album") {
+      listToRender = GM.sortByAlbum(listToRender);
     }
     
     var html = "";
     var currentYear = null;
+    var currentAlbum = null;
     for (var j = 0; j < listToRender.length; j++) {
       var item = listToRender[j];
-      if (sortType !== "default" && item.year !== currentYear) {
+      if (sortType === "album") {
+        var albumName = item.album || "未知专辑";
+        if (albumName !== currentAlbum) {
+          currentAlbum = albumName;
+          html += '<div class="sel-year-header">' + GM.esc(albumName) + '</div>';
+        }
+      } else if (sortType !== "default" && item.year !== currentYear) {
          currentYear = item.year;
          html += '<div class="sel-year-header">' + currentYear + (currentYear !== "未知" ? " 年" : "年份") + '</div>';
       }
@@ -1459,7 +1543,7 @@ var GM = window.GM = window.GM || {};
       if (kw && m.trackName.toLowerCase().indexOf(kw) === -1) continue;
       var year = m.releaseDate ? m.releaseDate.substring(0, 4) : "未知";
       var sortYear = year === "未知" ? 9999 : parseInt(year);
-      listToRender.push({ id: poolIds[i], name: m.trackName, year: year, sortYear: sortYear, originalIndex: i });
+      listToRender.push({ id: poolIds[i], name: m.trackName, year: year, sortYear: sortYear, album: m.collectionName || "", releaseDate: m.releaseDate || "", originalIndex: i });
     }
 
     if (sortType === "asc") {
@@ -1476,13 +1560,22 @@ var GM = window.GM = window.GM || {};
         }
         return a2.originalIndex - b2.originalIndex;
       });
+    } else if (sortType === "album") {
+      listToRender = GM.sortByAlbum(listToRender);
     }
 
     var html = "";
     var currentYear = null;
+    var currentAlbum = null;
     for (var j = 0; j < listToRender.length; j++) {
       var item = listToRender[j];
-      if (sortType !== "default" && item.year !== currentYear) {
+      if (sortType === "album") {
+        var albumName = item.album || "未知专辑";
+        if (albumName !== currentAlbum) {
+          currentAlbum = albumName;
+          html += '<div class="sel-year-header">' + GM.esc(albumName) + '</div>';
+        }
+      } else if (sortType !== "default" && item.year !== currentYear) {
         currentYear = item.year;
         html += '<div class="sel-year-header">' + currentYear + (currentYear !== "未知" ? " 年" : "年份") + '</div>';
       }
@@ -1589,12 +1682,8 @@ var GM = window.GM = window.GM || {};
     var b = GM.state.brawl;
     if (b.selected.length !== b.size) return;
 
-    // 1. 数据转换与洗牌
-    var arr = b.selected.slice();
-    for (var k = arr.length - 1; k > 0; k--) {
-      var j = Math.floor(Math.random() * (k + 1));
-      var tmp = arr[k]; arr[k] = arr[j]; arr[j] = tmp;
-    }
+    // 1. 数据转换与洗牌（V3.1：完全随机 + 冲突解决，尽量避免首轮同歌手内战）
+    var arr = GM.shuffleBrawl(b.selected);
 
     // 2. 赛制与对阵树重置
     if (GM.state.size !== b.size) {
@@ -1755,9 +1844,15 @@ var GM = window.GM = window.GM || {};
       return;
     }
     var arr = filled.slice();
-    for (var k = arr.length - 1; k > 0; k--) {
-      var j = Math.floor(Math.random() * (k + 1));
-      var tmp = arr[k]; arr[k] = arr[j]; arr[j] = tmp;
+    if (GM.state.brawl && GM.state.brawl.active) {
+      // 大乱斗模式：完全随机 + 冲突解决，首轮尽量避免同歌手内战
+      arr = GM.shuffleBrawl(arr);
+    } else {
+      // 单歌手模式：保持原有纯 Fisher-Yates 洗牌
+      for (var k = arr.length - 1; k > 0; k--) {
+        var j = Math.floor(Math.random() * (k + 1));
+        var tmp = arr[k]; arr[k] = arr[j]; arr[j] = tmp;
+      }
     }
     var next = new Array(GM.seeds()).fill("");
     for (var m = 0; m < arr.length && m < GM.seeds(); m++) next[m] = arr[m];

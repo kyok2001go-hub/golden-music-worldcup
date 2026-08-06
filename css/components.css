@@ -218,6 +218,11 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
 .vs-close { position: absolute; top: 8px; right: 10px; z-index: 10; cursor: pointer; color: rgba(255,255,255,.5); font-size: 20px; padding: 6px 8px; line-height: 1; }
 .vs-close:hover { color: #fff; }
 
+/* V3.1.1 返回前一场：与右上角 ✕ 对称的左上角按钮 */
+.vs-back { position: absolute; top: 8px; left: 10px; z-index: 10; cursor: pointer; color: rgba(255,255,255,.5); font-size: 13px; padding: 6px 8px; line-height: 1; display: flex; align-items: center; gap: 3px; user-select: none; transition: color .15s; }
+.vs-back-icon { font-size: 20px; line-height: 1; transform: translateY(-1px); }
+.vs-back:hover { color: #fff; }
+
 .vs-title { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-size: 25px; font-weight: 800; color: #f0f1f8; text-align: center; letter-spacing: .5px; padding: 40px 16px 20px; }
 
 .vs-body { padding: 0 20px; flex: 1; display: flex; flex-direction: column; justify-content: center; }
@@ -518,6 +523,8 @@ td.node .placeholder { display: block; color: rgba(255,255,255,.35); font-size: 
     overflow-y: auto; overflow-x: hidden;
   }
   .vs-close { top: 20px; right: 16px; font-size: 26px; }
+  .vs-back { top: 20px; left: 16px; font-size: 14px; padding: 8px; }
+  .vs-back-icon { font-size: 24px; }
   .vs-title { font-size: 22px; padding: 20vh 16px 3vh; flex: 0 0 auto; }
   .vs-body { padding: 0 16px; flex: 0 0 auto; margin-top: 5vh; }
   .vs-cards { gap: 10px; }
