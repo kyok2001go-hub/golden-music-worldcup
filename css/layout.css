@@ -148,6 +148,23 @@
 .qs-hero-icons .qs-icon-side:first-child { object-position: right center; }
 .qs-hero-icons .qs-icon-side:last-child  { object-position: left center; }
 
+/* 两侧图标浮动动画（页面加载完毕后，由 JS 附加 .loaded 触发，避免影响首屏性能） */
+@keyframes qs-float-left {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes qs-float-right {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
+}
+.qs-hero-icons.loaded .qs-icon-side:first-child {
+  animation: qs-float-left 4s ease-in-out infinite;
+}
+.qs-hero-icons.loaded .qs-icon-side:last-child {
+  animation: qs-float-right 3.5s ease-in-out infinite;
+  animation-delay: 0.3s;
+}
+
 /* 初始页一体化模式：由 HTML 默认预置，JS 在有内容时移除 */
 .qs-initial-mode .header-section {
   display: none !important;

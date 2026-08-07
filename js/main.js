@@ -2246,4 +2246,10 @@ var GM = window.GM = window.GM || {};
     if (e.target === deepSearchMask) closeDeepSearchModal();
   });
 
+  // 等待页面完全加载完毕后（避免影响加载性能），再给英雄区图标添加 .loaded 类以触发浮动动画
+  window.addEventListener('load', function() {
+    var heroIcons = document.querySelector('.qs-hero-icons');
+    if (heroIcons) heroIcons.classList.add('loaded');
+  });
+
 })();
