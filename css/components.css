@@ -70,9 +70,9 @@
 .qs-search-box::before {
   content: "";
   position: absolute;
-  inset: -3px -8px -16px; /* 下部延伸更多，光晕从下方溢出 */
+  inset: -3px -8px -20px; /* 下部延伸随搜索框高度同步放大 */
   z-index: -2; 
-  border-radius: 20px;
+  border-radius: 24px;
   background: linear-gradient(90deg, #5b6fc4, #c498ff, #F0AC4A, #5b6fc4);
   background-size: 200% 200%;
   filter: blur(18px);
@@ -94,7 +94,7 @@
 
 .qs-search-input {
   flex: 1; min-width: 0; background: transparent; border: none; color: #fff;
-  padding: 16px; font-size: 16px; outline: none;
+  padding: 19px 16px; font-size: 16px; outline: none;
 }
 .qs-search-input::placeholder { color: rgba(255,255,255,.3); }
 .qs-search-size {
