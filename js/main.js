@@ -692,7 +692,6 @@ var GM = window.GM = window.GM || {};
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePopup(); });
   window.addEventListener("resize", function () {
     if (document.getElementById("viewBracket").style.display === "block") GM.drawConnectors();
-    if (GM.isInputsEmpty()) GM.updateHeroSpacing();
   });
   document.getElementById("titleInput").addEventListener("input", function (e) {
     GM.state.title = e.target.value;

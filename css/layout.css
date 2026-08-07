@@ -107,7 +107,7 @@
   justify-content: center;
   align-items: center;
   width: 100%;
-  margin-bottom: var(--hero-x, 32px);
+  margin-bottom: 28px;
 }
 .qs-title-img {
   width: 40%;
@@ -124,7 +124,7 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  margin-bottom: var(--hero-x-13, 42px);
+  margin-bottom: 36px;
 }
 .qs-icon-center {
   height: 160px;

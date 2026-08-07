@@ -158,21 +158,6 @@ GM.render = function () {
   }
 };
 
-/* ===== 初始页英雄区间距自适应：测量标题图离视口顶部的实际距离 X，将其写入 CSS 变量 ===== */
-GM.updateHeroSpacing = function () {
-  var qs1 = document.getElementById("qsState1");
-  var titleImg = document.querySelector(".qs-title-img");
-  if (!qs1 || !titleImg) return;
-  // 等待一帧确保布局已稳定
-  requestAnimationFrame(function () {
-    var x = Math.round(titleImg.getBoundingClientRect().top);
-    if (x > 0) {
-      qs1.style.setProperty("--hero-x",    x + "px");
-      qs1.style.setProperty("--hero-x-13", Math.round(x * 1.3) + "px");
-    }
-  });
-};
-
 /* ===== 快速开始视图渲染 ===== */
 GM.renderQuickStart = function (done, TM) {
   var qs1 = document.getElementById("qsState1");
@@ -186,7 +171,6 @@ GM.renderQuickStart = function (done, TM) {
     qs1.style.display = "flex";
     qs2.style.display = "none";
     document.getElementById("qsActionsWrap").style.display = "none";
-    GM.updateHeroSpacing(); // 测量 X 并写入 CSS 变量
   } else {
     // 有内容状态：移除一体化模式（恢复 header 与边框）
     document.documentElement.classList.remove("has-saved-state");
