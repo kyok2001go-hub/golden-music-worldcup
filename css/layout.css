@@ -148,7 +148,7 @@
 .qs-hero-icons .qs-icon-side:first-child { object-position: right center; }
 .qs-hero-icons .qs-icon-side:last-child  { object-position: left center; }
 
-/* 初始页一体化模式：由 JS 在初始状态时添加到 .page 上 */
+/* 初始页一体化模式：由 HTML 默认预置，JS 在有内容时移除 */
 .qs-initial-mode .header-section {
   display: none !important;
 }
@@ -156,6 +156,18 @@
   border-color: transparent !important;
   background: #121212 !important;
   border-radius: 8px !important;
+}
+
+/* 返回用户覆盖：head 内联脚本检测到 localStorage 数据时，
+   给 <html> 加 has-saved-state，抵消上方 qs-initial-mode 效果，
+   使返回用户从第一帧起就看到正确的有内容布局（无闪烁）*/
+.has-saved-state .qs-initial-mode .header-section {
+  display: block !important;
+}
+.has-saved-state .qs-initial-mode #viewQuickStart {
+  border-color: rgba(255,255,255,.12) !important;
+  background: linear-gradient(to bottom, var(--theme-vqs-start, #130E18) 0%, #130E18 100%) !important;
+  border-radius: 0 0 8px 8px !important;
 }
 
 /* 快速开始页底部链接 */

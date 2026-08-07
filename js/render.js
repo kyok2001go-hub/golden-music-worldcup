@@ -181,6 +181,7 @@ GM.renderQuickStart = function (done, TM) {
 
   if (GM.isInputsEmpty()) {
     // 初始状态：添加一体化模式（隐藏 header，移除边框）
+    document.documentElement.classList.remove("has-saved-state");
     if (pageEl) pageEl.classList.add("qs-initial-mode");
     qs1.style.display = "flex";
     qs2.style.display = "none";
@@ -188,6 +189,7 @@ GM.renderQuickStart = function (done, TM) {
     GM.updateHeroSpacing(); // 测量 X 并写入 CSS 变量
   } else {
     // 有内容状态：移除一体化模式（恢复 header 与边框）
+    document.documentElement.classList.remove("has-saved-state");
     if (pageEl) pageEl.classList.remove("qs-initial-mode");
     qs1.style.display = "none";
     qs2.style.display = "flex";

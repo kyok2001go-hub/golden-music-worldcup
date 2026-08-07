@@ -8,9 +8,30 @@
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/layout.css">
 <link rel="stylesheet" href="css/components.css">
+<script>
+/* 首屏闪烁防止：同步读取 localStorage，若有已保存的歌曲数据则立即移除初始模式类 */
+(function () {
+  try {
+    var raw = localStorage.getItem('bracket_state_v5') ||
+              localStorage.getItem('bracket_state_v4');
+    if (raw) {
+      var s = JSON.parse(raw);
+      if (s && Array.isArray(s.inputs)) {
+        var hasData = false;
+        for (var i = 0; i < s.inputs.length; i++) {
+          if (s.inputs[i] && s.inputs[i].trim() !== '') { hasData = true; break; }
+        }
+        if (hasData) {
+          document.documentElement.classList.add('has-saved-state');
+        }
+      }
+    }
+  } catch (e) {}
+})();
+</script>
 </head>
 <body>
-<div class="page">
+<div class="page qs-initial-mode" id="pageRoot">
 
   <div class="header-section">
     <div class="header-covers" id="headerCovers"></div>
