@@ -167,6 +167,14 @@
   display: none !important;
 }
 
+/* 返回用户专属平滑淡入：未渲染完前隐藏，完成后通过过渡浮现，彻底解决空骨架屏闪烁问题 */
+.has-saved-state .page {
+  opacity: 0 !important;
+}
+.page {
+  transition: opacity 0.3s ease-out;
+}
+
 /* 返回用户覆盖：head 内联脚本检测到 localStorage 数据时，
    给 <html> 加 has-saved-state，抵消上方 qs-initial-mode 效果，
    使返回用户从第一帧起就看到正确的有内容布局（无闪烁）*/
