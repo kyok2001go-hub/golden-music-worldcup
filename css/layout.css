@@ -157,6 +157,15 @@
   background: #121212 !important;
   border-radius: 8px !important;
 }
+.qs-initial-mode #qsState1 {
+  display: flex !important;
+}
+.qs-initial-mode #qsState2 {
+  display: none !important;
+}
+.qs-initial-mode #qsActionsWrap {
+  display: none !important;
+}
 
 /* 返回用户覆盖：head 内联脚本检测到 localStorage 数据时，
    给 <html> 加 has-saved-state，抵消上方 qs-initial-mode 效果，
@@ -168,6 +177,15 @@
   border-color: rgba(255,255,255,.12) !important;
   background: linear-gradient(to bottom, var(--theme-vqs-start, #130E18) 0%, #130E18 100%) !important;
   border-radius: 0 0 8px 8px !important;
+}
+.has-saved-state .qs-initial-mode #qsState1 {
+  display: none !important;
+}
+.has-saved-state .qs-initial-mode #qsState2 {
+  display: flex !important;
+}
+.has-saved-state .qs-initial-mode #qsActionsWrap {
+  display: block !important;
 }
 
 /* 快速开始页底部链接 */
