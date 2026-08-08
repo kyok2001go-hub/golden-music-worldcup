@@ -2252,19 +2252,41 @@ var GM = window.GM = window.GM || {};
     if (heroIcons) heroIcons.classList.add('loaded');
   });
 
-  // 修复 iOS Safari "撤销键入" (Shake to Undo) 弹窗问题：
-  // 核心原理：在文本框失去焦点时，瞬间将其从 DOM 树中拔出再原样插回，这样能直接打断浏览器底层的 Undo 追踪链条，
-  // 强制清空 iOS 的撤销栈(Undo Stack)，且不会像替换 type 为 password 那样产生瞬间变成黑点的视觉闪烁。
+  // ===== 修复 iOS Safari "撤销键入" (Shake to Undo) 弹窗问题 =====
+  // iOS 18 的 Undo 栈由 WebKit 引擎在系统层面维护，无法通过 DOM 操作（拔插节点、切换 type）清空。
+  // 采用多层防御策略：
+
+  // 【第一层：拦截 undo/redo 动作】
+  // 当用户摇晃手机并点击"撤销"时，iOS 会在执行撤销前触发 beforeinput 事件。
+  // 我们在此拦截 historyUndo / historyRedo，调用 preventDefault() 使撤销操作无效化。
+  // 这样即使弹窗出现，点击"撤销"也不会改变任何输入框的内容。
+  document.addEventListener('beforeinput', function(e) {
+    if (e.inputType === 'historyUndo' || e.inputType === 'historyRedo') {
+      e.preventDefault();
+    }
+  }, true);
+
+  // 【第二层：输入框失焦时尝试断开编辑会话】
+  // 在输入框 blur 时，通过瞬间设置 readOnly 来向 WebKit 发出"编辑会话已结束"的信号，
+  // 同时清除文本选区，帮助刷新底层的编辑上下文。在部分 iOS 版本上可减少弹窗触发概率。
   document.addEventListener('blur', function(e) {
     var el = e.target;
-    if (el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'search')))) {
-      var p = el.parentNode;
-      if (p) {
-        var n = el.nextSibling;
-        p.removeChild(el);
-        p.insertBefore(el, n);
-      }
-    }
-  }, true); // 使用捕获阶段，因为 blur 事件不冒泡
+    if (!el) return;
+    var isInput = el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'search');
+    var isTextarea = el.tagName === 'TEXTAREA';
+    if (!isInput && !isTextarea) return;
+
+    // 瞬间切为 readOnly 再恢复，向引擎发出编辑结束信号
+    el.readOnly = true;
+    // 清除可能残留的文本选区
+    try {
+      var sel = window.getSelection();
+      if (sel) sel.removeAllRanges();
+    } catch (_) {}
+    // 使用 requestAnimationFrame 确保浏览器完成一帧渲染后再恢复可编辑状态
+    requestAnimationFrame(function() {
+      el.readOnly = false;
+    });
+  }, true);
 
 })();
