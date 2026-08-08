@@ -171,7 +171,7 @@
 }
 .qs-initial-mode #viewQuickStart {
   border-color: transparent !important;
-  background: #121212 !important;
+  background: #090909 !important;
   border-radius: 8px !important;
 }
 .qs-initial-mode #qsState1 {
@@ -318,6 +318,15 @@ td.node.champion .champ-name { display: block; margin-top: 2px; }
   .qs-title-img { width: 56%; }
   .qs-icon-center { height: 120px; }
   .qs-icon-side { height: 72px; max-width: 100px; }
+  .qs-search-box {
+    width: calc(100% + 20px);
+    margin-left: -10px;
+    margin-right: -10px;
+  }
+  .qs-search-box::before {
+    inset: -4.5px -5px -30px;
+    filter: blur(22px);
+  }
   .toolbar { gap: 6px; padding: 8px; }
   .toolbar .hint { order: 0; margin-right: 0; margin-bottom: 8px; margin-top: 4px; }
   

@@ -9,6 +9,11 @@ body {
   background-attachment: fixed;
   padding: 20px 12px 20px;
   color: #eef0f8;
+  transition: background 0.3s ease;
+}
+
+body:has(.qs-initial-mode) {
+  background: #090909;
 }
 
 /* ===== 页面容器 ===== */
