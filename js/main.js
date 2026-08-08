@@ -735,7 +735,10 @@ var GM = window.GM = window.GM || {};
     batchMask.classList.add("show");
     batchArea.focus();
   }
-  function closeBatchModal() { batchMask.classList.remove("show"); }
+  function closeBatchModal() { 
+    batchMask.classList.remove("show"); 
+    batchArea.value = ""; // 关闭时彻底清空
+  }
 
   function applyBatch() {
     batchArea.blur();
@@ -1011,7 +1014,10 @@ var GM = window.GM = window.GM || {};
     artistMask.classList.add("show");
     artistInput.focus();
   }
-  function closeArtistModal() { artistMask.classList.remove("show"); }
+  function closeArtistModal() { 
+    artistMask.classList.remove("show"); 
+    artistInput.value = ""; // 关闭时彻底清空
+  }
   function setArtistStatus(msg, type) {
     artistStatus.textContent = msg;
     artistStatus.className = "artist-status" + (type ? " " + type : "");
@@ -1257,11 +1263,20 @@ var GM = window.GM = window.GM || {};
     GM.syncSeedInputs();
     GM.save(); GM.render();
     selectMask.classList.remove("show");
+    selectSearchInput.value = ""; // 关闭时彻底清空
     GM.toast("自选歌曲已应用成功");
   });
 
-  document.getElementById("selectClose").addEventListener("click", function() { selectMask.classList.remove("show"); });
-  selectMask.addEventListener("click", function(e) { if (e.target === selectMask) selectMask.classList.remove("show"); });
+  document.getElementById("selectClose").addEventListener("click", function() { 
+    selectMask.classList.remove("show"); 
+    selectSearchInput.value = ""; // 关闭时彻底清空
+  });
+  selectMask.addEventListener("click", function(e) { 
+    if (e.target === selectMask) {
+      selectMask.classList.remove("show"); 
+      selectSearchInput.value = ""; // 关闭时彻底清空
+    }
+  });
   document.getElementById("qsBtnCustomSelect").addEventListener("click", openSelectModal);
 
   /* ===== V3.0 歌曲大乱斗：比赛设置弹窗 + 挑歌视图 ===== */
@@ -1377,7 +1392,11 @@ var GM = window.GM = window.GM || {};
     brawlMask.classList.add("show");
     brawlArtistInput.focus();
   }
-  function closeBrawlModal() { brawlMask.classList.remove("show"); }
+  function closeBrawlModal() { 
+    brawlMask.classList.remove("show"); 
+    brawlSearchInput.value = ""; // 关闭时彻底清空
+    brawlArtistInput.value = "";
+  }
 
   document.getElementById("btnBrawlEntry").addEventListener("click", openBrawlModal);
   document.getElementById("brawlBtnEdit").addEventListener("click", openBrawlModal);
@@ -2085,6 +2104,7 @@ var GM = window.GM = window.GM || {};
 
   function closeDeepSearchModal() {
     deepSearchMask.classList.remove("show");
+    deepSearchInput.value = ""; // 关闭时彻底清空
     if (deepSearchMode === "single") {
       renderSelectList();
     } else if (deepSearchMode === "brawl") {
@@ -2278,6 +2298,13 @@ var GM = window.GM = window.GM || {};
 
     // 瞬间切为 readOnly 再恢复，向引擎发出编辑结束信号
     el.readOnly = true;
+    
+    // 参考"点击推荐歌手不触发弹窗"的逻辑：
+    // 通过纯代码层面的重新赋值，试图覆盖或打断底层记录的键盘输入历史
+    var currentVal = el.value;
+    el.value = '';
+    el.value = currentVal;
+
     // 清除可能残留的文本选区
     try {
       var sel = window.getSelection();
