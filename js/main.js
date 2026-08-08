@@ -2253,14 +2253,17 @@ var GM = window.GM = window.GM || {};
   });
 
   // 修复 iOS Safari "撤销键入" (Shake to Undo) 弹窗问题：
-  // 核心原理：在文本框失去焦点时，瞬间将其类型切换为 password 再切换回来，强制清空浏览器底层的撤销栈(Undo Stack)
-  // 这样当用户在页面其他地方晃动手机时，就不会再弹出刚才输入框的撤销提示了。
+  // 核心原理：在文本框失去焦点时，瞬间将其从 DOM 树中拔出再原样插回，这样能直接打断浏览器底层的 Undo 追踪链条，
+  // 强制清空 iOS 的撤销栈(Undo Stack)，且不会像替换 type 为 password 那样产生瞬间变成黑点的视觉闪烁。
   document.addEventListener('blur', function(e) {
     var el = e.target;
-    if (el && el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'search')) {
-      var oldType = el.getAttribute('type') || 'text';
-      el.type = 'password';
-      el.type = oldType;
+    if (el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'search')))) {
+      var p = el.parentNode;
+      if (p) {
+        var n = el.nextSibling;
+        p.removeChild(el);
+        p.insertBefore(el, n);
+      }
     }
   }, true); // 使用捕获阶段，因为 blur 事件不冒泡
 
